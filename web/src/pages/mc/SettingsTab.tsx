@@ -1,0 +1,286 @@
+// Server settings: EULA, launch configuration (panel-managed overrides),
+// and the server.properties editor (comment-preserving on the backend).
+
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "../../api/client";
+import type { MCServer, PropEntry } from "../../api/types";
+import { Spinner, Toggle } from "../../ui/bits";
+import { useConfirm } from "../../ui/Confirm";
+import { Icon } from "../../ui/Icon";
+import { useToast } from "../../ui/Toast";
+
+export function SettingsTab({ id, server }: { id: string; server: MCServer }) {
+  return (
+    <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: "var(--gap)" }}>
+      {!server.eulaAccepted && <EulaSection id={id} />}
+      <LaunchSection id={id} server={server} />
+      <PropertiesSection id={id} serverState={server.state} />
+    </div>
+  );
+}
+
+function EulaSection({ id }: { id: string }) {
+  const confirm = useConfirm();
+  const toast = useToast();
+
+  async function accept() {
+    const ok = await confirm({
+      title: "Accept the Minecraft EULA",
+      target: id,
+      danger: false,
+      body: (
+        <>
+          Starting a server requires agreeing to the{" "}
+          <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noreferrer">
+            Minecraft End User License Agreement
+          </a>
+          . The panel will write <span className="mono">eula=true</span> for{" "}
+          <b>{id}</b> on your behalf.
+        </>
+      ),
+      confirmLabel: "Accept EULA",
+    });
+    if (!ok) return;
+    try {
+      await api(`/api/minecraft/${id}/eula`, { method: "POST", confirm: id });
+      toast("ok", "EULA accepted");
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "failed");
+    }
+  }
+
+  return (
+    <section className="danger-strip row">
+      <Icon name="warning" size={14} />
+      <span className="grow">
+        The Mojang EULA has not been accepted; the server cannot start.
+      </span>
+      <button className="btn btn-sm btn-primary" onClick={accept}>
+        Review &amp; accept
+      </button>
+    </section>
+  );
+}
+
+function LaunchSection({ id, server }: { id: string; server: MCServer }) {
+  const toast = useToast();
+  const [mem, setMem] = useState(server.mem ?? "");
+  const [jvmArgs, setJvmArgs] = useState((server.jvmArgs ?? []).join(" "));
+  const [aikar, setAikar] = useState(server.aikar);
+  const [autoStart, setAutoStart] = useState(server.autoStart);
+  const [autoRestart, setAutoRestart] = useState(server.autoRestart);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setMem(server.mem ?? "");
+    setJvmArgs((server.jvmArgs ?? []).join(" "));
+    setAikar(server.aikar);
+    setAutoStart(server.autoStart);
+    setAutoRestart(server.autoRestart);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const dirty =
+    mem !== (server.mem ?? "") ||
+    jvmArgs !== (server.jvmArgs ?? []).join(" ") ||
+    aikar !== server.aikar ||
+    autoStart !== server.autoStart ||
+    autoRestart !== server.autoRestart;
+
+  async function save() {
+    setSaving(true);
+    try {
+      await api(`/api/minecraft/${id}/config`, {
+        method: "PUT",
+        body: { mem, jvmArgs, aikar, autoStart, autoRestart },
+      });
+      toast("ok", "launch settings saved (applies on next start)");
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section>
+      <div className="row" style={{ marginBottom: 8 }}>
+        <span className="label">Launch configuration</span>
+        <span className="small faint">applies on next start</span>
+        {dirty && (
+          <button className="btn btn-sm btn-primary right" onClick={save} disabled={saving}>
+            {saving ? <Spinner size={12} /> : <Icon name="check" size={12} />}
+            Save
+          </button>
+        )}
+      </div>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        <div className="field">
+          <span className="label">Memory (Xms/Xmx)</span>
+          <input
+            className="input mono"
+            value={mem}
+            placeholder="e.g. 6G"
+            onChange={(e) => setMem(e.target.value)}
+            spellCheck={false}
+          />
+          <span className="hint">Java heap size, e.g. 4G or 6144M</span>
+        </div>
+        <div className="field">
+          <span className="label">Extra JVM arguments</span>
+          <input
+            className="input mono"
+            value={jvmArgs}
+            placeholder="-Dfml.readTimeout=180 …"
+            onChange={(e) => setJvmArgs(e.target.value)}
+            spellCheck={false}
+          />
+          <span className="hint">space-separated, appended to the java command</span>
+        </div>
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <div className="setting-row">
+          <div className="desc">
+            <div className="t">Aikar GC flags</div>
+            <div className="s">Recommended G1GC tuning for Paper-family servers</div>
+          </div>
+          <Toggle checked={aikar} onChange={setAikar} label="Aikar flags" />
+        </div>
+        <div className="setting-row">
+          <div className="desc">
+            <div className="t">Start with panel</div>
+            <div className="s">Launch this server automatically when the panel starts</div>
+          </div>
+          <Toggle checked={autoStart} onChange={setAutoStart} label="autostart" />
+        </div>
+        <div className="setting-row">
+          <div className="desc">
+            <div className="t">Restart after crash</div>
+            <div className="s">Relaunch automatically after an unexpected exit (max 3 in 10 min)</div>
+          </div>
+          <Toggle checked={autoRestart} onChange={setAutoRestart} label="auto-restart" />
+        </div>
+      </div>
+      <dl className="kv" style={{ marginTop: 8 }}>
+        <dt>Java</dt>
+        <dd className="mono">{server.java || "java"}</dd>
+        <dt>Jar</dt>
+        <dd className="mono">{server.jar || "run.sh"}</dd>
+        <dt>Directory</dt>
+        <dd className="mono">{server.dir}</dd>
+      </dl>
+    </section>
+  );
+}
+
+// Properties shown first, in gameplay-relevant order; the rest follow
+// alphabetically.
+const PROP_PRIORITY = [
+  "motd", "max-players", "difficulty", "gamemode", "hardcore", "pvp",
+  "view-distance", "simulation-distance", "spawn-protection", "allow-flight",
+  "allow-nether", "enable-command-block", "online-mode", "white-list",
+  "enforce-whitelist", "level-name", "level-seed", "server-port",
+];
+
+function PropertiesSection({ id, serverState }: { id: string; serverState: string }) {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["mc-props", id],
+    queryFn: () => api<{ properties: PropEntry[] }>(`/api/minecraft/${id}/properties`),
+  });
+
+  const ordered = useMemo(() => {
+    const props = data?.properties ?? [];
+    const rank = new Map(PROP_PRIORITY.map((k, i) => [k, i]));
+    return [...props].sort((a, b) => {
+      const ra = rank.get(a.key) ?? 1000;
+      const rb = rank.get(b.key) ?? 1000;
+      return ra !== rb ? ra - rb : a.key.localeCompare(b.key);
+    });
+  }, [data]);
+
+  const dirtyKeys = Object.keys(edits).filter((k) => {
+    const orig = data?.properties?.find((p) => p.key === k)?.value;
+    return edits[k] !== orig;
+  });
+
+  async function save() {
+    const changes: Record<string, string> = {};
+    for (const k of dirtyKeys) changes[k] = edits[k];
+    if (Object.keys(changes).length === 0) return;
+    setSaving(true);
+    try {
+      await api(`/api/minecraft/${id}/properties`, { method: "PUT", body: { changes } });
+      toast("ok", `saved ${Object.keys(changes).length} propert${Object.keys(changes).length === 1 ? "y" : "ies"}`);
+      setEdits({});
+      queryClient.invalidateQueries({ queryKey: ["mc-props", id] });
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <section>
+        <Spinner />
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <div className="row" style={{ marginBottom: 8 }}>
+        <span className="label">server.properties</span>
+        <span className="small faint">
+          comments and order are preserved
+          {serverState === "running" ? " · changes apply on restart" : ""}
+        </span>
+        {dirtyKeys.length > 0 && (
+          <button className="btn btn-sm btn-primary right" onClick={save} disabled={saving}>
+            {saving ? <Spinner size={12} /> : <Icon name="check" size={12} />}
+            Save {dirtyKeys.length} change{dirtyKeys.length > 1 ? "s" : ""}
+          </button>
+        )}
+      </div>
+      <div className="props-grid">
+        {ordered.map((p) => {
+          const val = edits[p.key] ?? p.value;
+          const dirty = dirtyKeys.includes(p.key);
+          const isBool = p.value === "true" || p.value === "false";
+          return (
+            <div className="field" key={p.key}>
+              <span className="label" style={dirty ? { color: "var(--accent-text)" } : undefined}>
+                {p.key}
+                {dirty ? " *" : ""}
+              </span>
+              {isBool ? (
+                <select
+                  className="select mono"
+                  value={val}
+                  onChange={(e) => setEdits((prev) => ({ ...prev, [p.key]: e.target.value }))}
+                >
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              ) : (
+                <input
+                  className="input mono"
+                  value={val}
+                  onChange={(e) => setEdits((prev) => ({ ...prev, [p.key]: e.target.value }))}
+                  spellCheck={false}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}

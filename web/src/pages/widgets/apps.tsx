@@ -1,0 +1,244 @@
+// Application widgets: system info, temperatures, storage, services,
+// Minecraft, Plex.
+
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { api } from "../../api/client";
+import type { PlexStatus, StorageOverview } from "../../api/types";
+import { fmtBytes, fmtPct, fmtTemp } from "../../lib/format";
+import { useLatestMetrics, useMCServers, useServices } from "../../state/live";
+import { useSystem } from "../../state/system";
+import { CapacityBar, MCStateBadge, ServiceBadge } from "../../ui/bits";
+import { Icon } from "../../ui/Icon";
+
+// --- System ----------------------------------------------------------------
+
+export function SystemWidget() {
+  const { info, uptime } = useSystem();
+  const m = useLatestMetrics();
+  if (!info) return null;
+  return (
+    <dl className="kv">
+      <dt>Host</dt>
+      <dd>{info.hostname}</dd>
+      <dt>OS</dt>
+      <dd title={info.os}>{info.os}</dd>
+      <dt>Kernel</dt>
+      <dd>{info.kernel}</dd>
+      <dt>CPU</dt>
+      <dd title={info.cpuModel}>
+        {info.cpuCores}× {shortCpu(info.cpuModel)}
+      </dd>
+      <dt>Memory</dt>
+      <dd>{fmtBytes(info.memTotal, 0)}</dd>
+      <dt>Uptime</dt>
+      <dd>{uptime}</dd>
+      <dt>Load</dt>
+      <dd>{m ? m.load.map((l) => l.toFixed(2)).join(" · ") : "—"}</dd>
+    </dl>
+  );
+}
+
+function shortCpu(model: string): string {
+  return model
+    .replace(/\((R|TM|C)\)/gi, "")
+    .replace(/CPU\s*@.*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// --- Temperatures -----------------------------------------------------------
+
+function tempLevel(label: string, c: number): "" | "warn-text" | "crit-text" {
+  const isDrive = /drivetemp|sd[a-z]/i.test(label);
+  const warn = isDrive ? 45 : 75;
+  const crit = isDrive ? 55 : 90;
+  if (c >= crit) return "crit-text";
+  if (c >= warn) return "warn-text";
+  return "";
+}
+
+export function TempsWidget() {
+  const m = useLatestMetrics();
+  const temps = m?.temps ?? [];
+  if (temps.length === 0) {
+    return <div className="small faint">No temperature sensors detected.</div>;
+  }
+  return (
+    <div className="mini-rows">
+      {temps.map((t) => (
+        <div key={t.label} className="mini-row">
+          <span className="truncate muted small">{prettyTempLabel(t.label)}</span>
+          <span className={`right num ${tempLevel(t.label, t.c)}`}>{fmtTemp(t.c)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function prettyTempLabel(label: string): string {
+  return label
+    .replace("coretemp Package id 0", "CPU package")
+    .replace("nvme Composite", "NVMe")
+    .replace("drivetemp ", "Drive ");
+}
+
+// --- Storage ----------------------------------------------------------------
+
+export function StorageWidget() {
+  const { data } = useQuery({
+    queryKey: ["storage"],
+    queryFn: () => api<StorageOverview>("/api/storage"),
+    refetchInterval: 30_000,
+  });
+  const pools = data?.pools ?? [];
+  const disks = data?.disks ?? [];
+  const unhealthy = disks.filter((d) => d.smart.healthy === false).length;
+  const flagged = disks.filter(
+    (d) => (d.smart.reallocated ?? 0) > 0 || (d.smart.pendingSectors ?? 0) > 0,
+  ).length;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {pools.map((p) => (
+        <div key={p.mount}>
+          <div className="row small" style={{ marginBottom: 5 }}>
+            <span className="muted">{p.mount}</span>
+            <span className="right num">
+              {fmtBytes(p.used)} / {fmtBytes(p.total)}
+              <span className="faint"> · {fmtPct((p.used / p.total) * 100)}</span>
+            </span>
+          </div>
+          <CapacityBar used={p.used} total={p.total} thick />
+          <div className="row small faint" style={{ marginTop: 4 }}>
+            <span>
+              {p.branches.length} branches · {p.fsType}
+            </span>
+          </div>
+        </div>
+      ))}
+      <div className="row small">
+        <span className="muted">{disks.length} disks</span>
+        {unhealthy > 0 ? (
+          <span className="badge crit right">
+            {unhealthy} SMART failure{unhealthy > 1 ? "s" : ""}
+          </span>
+        ) : flagged > 0 ? (
+          <span className="badge warn right">{flagged} flagged</span>
+        ) : (
+          <span className="badge ok right">all healthy</span>
+        )}
+      </div>
+      <Link to="/storage" className="small">
+        Storage details →
+      </Link>
+    </div>
+  );
+}
+
+// --- Services ---------------------------------------------------------------
+
+export function ServicesWidget() {
+  const services = useServices();
+  const shown = services.filter((s) => s.loadState !== "not-found").slice(0, 8);
+  return (
+    <div className="mini-rows">
+      {shown.map((s) => (
+        <div key={s.unit} className="mini-row">
+          <span className="truncate">{s.unit.replace(/\.(service|timer)$/, "")}</span>
+          <span className="right">
+            <ServiceBadge active={s.activeState} sub={s.subState} />
+          </span>
+        </div>
+      ))}
+      {shown.length === 0 && <div className="small faint">No services configured.</div>}
+    </div>
+  );
+}
+
+// --- Minecraft --------------------------------------------------------------
+
+export function MinecraftWidget() {
+  const servers = useMCServers();
+  return (
+    <div className="mini-rows">
+      {servers.map((s) => (
+        <Link
+          key={s.id}
+          to={`/minecraft/${s.id}`}
+          className="mini-row"
+          style={{ color: "inherit", textDecoration: "none" }}
+        >
+          <Icon name="minecraft" size={14} className="faint" />
+          <span style={{ fontWeight: 550 }}>{s.name}</span>
+          <span className="small faint">{s.version}</span>
+          <span className="right row" style={{ gap: 10 }}>
+            {s.state === "running" && (
+              <>
+                <span className="small muted num">
+                  {(s.onlinePlayers ?? []).length}/{s.maxPlayers ?? "—"}{" "}
+                  <Icon name="users" size={11} />
+                </span>
+                <span className="small muted num">{fmtPct(s.cpuPct)}</span>
+                <span className="small muted num">{fmtBytes(s.memBytes, 1)}</span>
+              </>
+            )}
+            <MCStateBadge state={s.state} />
+          </span>
+        </Link>
+      ))}
+      {servers.length === 0 && (
+        <div className="small faint">No Minecraft servers discovered.</div>
+      )}
+    </div>
+  );
+}
+
+// --- Plex -------------------------------------------------------------------
+
+export function PlexWidget() {
+  const { data } = useQuery({
+    queryKey: ["plex"],
+    queryFn: () => api<PlexStatus>("/api/plex"),
+    refetchInterval: 10_000,
+  });
+  if (!data) return null;
+  if (!data.configured) {
+    return (
+      <div className="small faint">
+        Not configured — set <span className="mono">plex.token</span> in config.yaml.
+      </div>
+    );
+  }
+  if (!data.reachable) {
+    return <div className="small crit-text">Unreachable: {data.error}</div>;
+  }
+  return (
+    <div className="mini-rows">
+      {data.sessions.length === 0 && (
+        <div className="small faint">Nothing is playing right now.</div>
+      )}
+      {data.sessions.map((s, i) => (
+        <div key={i} className="mini-row" style={{ alignItems: "flex-start" }}>
+          <div className="grow" style={{ minWidth: 0 }}>
+            <div className="truncate" style={{ fontWeight: 550 }}>
+              {s.grandparent ? `${s.grandparent} — ${s.title}` : s.title}
+            </div>
+            <div className="small faint truncate">
+              {s.user} · {s.player}
+              {s.decision === "transcode" ? " · transcode" : ""}
+            </div>
+            <div className="bar" style={{ marginTop: 5 }}>
+              <i
+                style={{
+                  width: `${s.durationMs ? ((s.progressMs / s.durationMs) * 100).toFixed(1) : 0}%`,
+                }}
+              />
+            </div>
+          </div>
+          {s.state === "paused" && <span className="badge neutral">paused</span>}
+        </div>
+      ))}
+    </div>
+  );
+}

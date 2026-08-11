@@ -1,0 +1,166 @@
+/* Design tokens. Theme/accent/density are driven by attributes on <html>:
+   data-theme="dark|light", data-accent="blue|teal|violet|green|amber|rose",
+   data-density="compact|comfortable". */
+
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --r-card: 8px;
+  --r-ctl: 6px;
+
+  /* Status palette (validated; never used for chart series). */
+  --ok: #0ca30c;
+  --warn: #fab219;
+  --serious: #ec835a;
+  --crit: #d03b3b;
+
+  --sidebar-w: 208px;
+  --topbar-h: 48px;
+}
+
+/* --- Theme: dark (default) ------------------------------------------------ */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1216;
+  --surface: #151a21;
+  --surface-2: #1a2029;
+  --surface-3: #212936;
+  --border: #232a35;
+  --border-strong: #313b4a;
+  --text: #dfe4ec;
+  --text-2: #98a2b3;
+  --text-3: #667080;
+  --shadow: none;
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --grid: #222933;
+  --console-bg: #10141a;
+  --scrim: rgba(4, 6, 9, 0.6);
+  --ok-text: #4fbf4f;
+  --warn-text: #fab219;
+  --crit-text: #e05d5d;
+}
+
+/* --- Theme: light --------------------------------------------------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --surface-3: #eef0f3;
+  --border: #e2e5ea;
+  --border-strong: #ccd2db;
+  --text: #1b2129;
+  --text-2: #57616e;
+  --text-3: #8a94a1;
+  --shadow: 0 1px 2px rgba(27, 33, 41, 0.05);
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --grid: #e9ebee;
+  --console-bg: #14181d;
+  --scrim: rgba(27, 33, 41, 0.35);
+  --ok-text: #067d06;
+  --warn-text: #935e00;
+  --crit-text: #bb3434;
+}
+
+/* --- Accents -------------------------------------------------------------- */
+:root,
+:root[data-accent="blue"] {
+  --accent: #4f96f0;
+  --accent-strong: #2f7ad9;
+  --accent-soft: rgba(79, 150, 240, 0.13);
+  --accent-text: #7ab2f5;
+}
+:root[data-accent="teal"] {
+  --accent: #2fbdb3;
+  --accent-strong: #1d9c93;
+  --accent-soft: rgba(47, 189, 179, 0.13);
+  --accent-text: #5cd0c8;
+}
+:root[data-accent="violet"] {
+  --accent: #9d87f2;
+  --accent-strong: #7d63e0;
+  --accent-soft: rgba(157, 135, 242, 0.14);
+  --accent-text: #b6a5f6;
+}
+:root[data-accent="green"] {
+  --accent: #4cb85c;
+  --accent-strong: #379a46;
+  --accent-soft: rgba(76, 184, 92, 0.13);
+  --accent-text: #71cb7e;
+}
+:root[data-accent="amber"] {
+  --accent: #d9a62e;
+  --accent-strong: #b8880f;
+  --accent-soft: rgba(217, 166, 46, 0.14);
+  --accent-text: #e4bc59;
+}
+:root[data-accent="rose"] {
+  --accent: #e56b8c;
+  --accent-strong: #cc4a6f;
+  --accent-soft: rgba(229, 107, 140, 0.14);
+  --accent-text: #ef92aa;
+}
+:root[data-theme="light"][data-accent="blue"],
+:root[data-theme="light"]:not([data-accent]) {
+  --accent: #2a6fdb;
+  --accent-strong: #1f5cbb;
+  --accent-soft: rgba(42, 111, 219, 0.1);
+  --accent-text: #2a6fdb;
+}
+:root[data-theme="light"][data-accent="teal"] {
+  --accent: #0f8a80;
+  --accent-strong: #0b6f67;
+  --accent-soft: rgba(15, 138, 128, 0.1);
+  --accent-text: #0f8a80;
+}
+:root[data-theme="light"][data-accent="violet"] {
+  --accent: #6d4fd4;
+  --accent-strong: #5a3cc0;
+  --accent-soft: rgba(109, 79, 212, 0.1);
+  --accent-text: #6d4fd4;
+}
+:root[data-theme="light"][data-accent="green"] {
+  --accent: #2b8a3e;
+  --accent-strong: #217032;
+  --accent-soft: rgba(43, 138, 62, 0.1);
+  --accent-text: #2b8a3e;
+}
+:root[data-theme="light"][data-accent="amber"] {
+  --accent: #b08800;
+  --accent-strong: #8f6f00;
+  --accent-soft: rgba(176, 136, 0, 0.12);
+  --accent-text: #8f6f00;
+}
+:root[data-theme="light"][data-accent="rose"] {
+  --accent: #d6336c;
+  --accent-strong: #b52a5b;
+  --accent-soft: rgba(214, 51, 108, 0.1);
+  --accent-text: #d6336c;
+}
+
+/* --- Density -------------------------------------------------------------- */
+:root,
+:root[data-density="compact"] {
+  --fs: 13px;
+  --fs-sm: 11.5px;
+  --fs-lg: 15px;
+  --pad-cell: 6px 10px;
+  --pad-card: 12px 14px;
+  --gap: 12px;
+  --ctl-h: 28px;
+}
+:root[data-density="comfortable"] {
+  --fs: 14px;
+  --fs-sm: 12.5px;
+  --fs-lg: 16px;
+  --pad-cell: 9px 12px;
+  --pad-card: 16px 18px;
+  --gap: 16px;
+  --ctl-h: 32px;
+}
