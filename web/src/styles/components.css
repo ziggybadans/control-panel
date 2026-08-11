@@ -49,6 +49,10 @@
   color: var(--text-2);
   border-left: 2px solid transparent;
   cursor: pointer;
+  transition:
+    background var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out);
 }
 .nav-item:hover {
   background: var(--surface-2);
@@ -150,6 +154,15 @@
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
+  transition:
+    background var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out),
+    opacity var(--dur-1) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
+}
+.btn:active {
+  transform: scale(0.97);
 }
 .btn:hover {
   background: var(--surface-3);
@@ -219,6 +232,13 @@
   font-weight: 550;
   border: 1px solid transparent;
   white-space: nowrap;
+  transition:
+    background var(--dur-2) var(--ease-out),
+    color var(--dur-2) var(--ease-out);
+}
+
+.dot {
+  transition: background var(--dur-2) var(--ease-out);
 }
 .badge.ok {
   color: var(--ok-text);
@@ -294,6 +314,9 @@
 }
 .table tr:last-child td {
   border-bottom: none;
+}
+.table tbody tr {
+  transition: background 80ms var(--ease-out);
 }
 .table tbody tr:hover {
   background: var(--surface-2);
@@ -395,21 +418,47 @@ textarea.input {
   padding: 0 4px;
 }
 .tab {
+  position: relative;
   padding: 8px 12px;
   border: none;
   background: none;
   color: var(--text-2);
   font-weight: 500;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
   margin-bottom: -1px;
+  transition: color var(--dur-1) var(--ease-out);
 }
 .tab:hover {
   color: var(--text);
 }
 .tab.active {
   color: var(--text);
-  border-bottom-color: var(--accent);
+}
+/* Sliding underline: morphs between tabs via view transitions. */
+.tab-indicator {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  view-transition-name: tab-indicator;
+}
+
+/* Tab panel entrance. */
+.tab-panel {
+  animation: panel-in var(--dur-2) var(--ease-out);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
 }
 
 /* --- Modal ---------------------------------------------------------------- */
@@ -423,6 +472,7 @@ textarea.input {
   justify-content: center;
   padding: 10vh 16px 16px;
   z-index: 100;
+  animation: overlay-in var(--dur-2) var(--ease-out);
 }
 .modal {
   background: var(--surface);
@@ -433,6 +483,18 @@ textarea.input {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
+  animation: modal-in var(--dur-3) var(--ease-out);
+}
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
 }
 .modal.wide {
   max-width: 720px;
@@ -574,6 +636,12 @@ textarea.input {
   white-space: nowrap;
   z-index: 10;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  animation: tip-in 100ms var(--ease-out);
+}
+@keyframes tip-in {
+  from {
+    opacity: 0;
+  }
 }
 .chart-axis-label {
   font-size: 10px;
@@ -702,11 +770,63 @@ textarea.input {
   }
 }
 
+/* Generic entrance for conditionally rendered elements. */
+.fade-in-up {
+  animation: panel-in var(--dur-2) var(--ease-out);
+}
+
+/* Expand-reveal for drawers (journal logs, job output, hidden widgets):
+   grid-rows 0fr -> 1fr animates height without JS measurement. */
+.reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  animation: reveal var(--dur-3) var(--ease-out) forwards;
+}
+.reveal > * {
+  overflow: hidden;
+  min-height: 0;
+}
+@keyframes reveal {
+  to {
+    grid-template-rows: 1fr;
+  }
+}
+
+/* Dashboard widgets: quick staggered entrance on first paint. */
+.dash-grid > .card {
+  animation: card-in var(--dur-3) var(--ease-out) backwards;
+}
+.dash-grid > .card:nth-child(2) {
+  animation-delay: 25ms;
+}
+.dash-grid > .card:nth-child(3) {
+  animation-delay: 50ms;
+}
+.dash-grid > .card:nth-child(4) {
+  animation-delay: 75ms;
+}
+.dash-grid > .card:nth-child(5) {
+  animation-delay: 100ms;
+}
+.dash-grid > .card:nth-child(6) {
+  animation-delay: 120ms;
+}
+.dash-grid > .card:nth-child(n + 7) {
+  animation-delay: 140ms;
+}
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
 /* Dashboard editing */
 .widget-editing {
   outline: 1px dashed var(--border-strong);
   outline-offset: 2px;
   cursor: grab;
+  transition: outline-color var(--dur-1) var(--ease-out);
 }
 .widget-editing:active {
   cursor: grabbing;

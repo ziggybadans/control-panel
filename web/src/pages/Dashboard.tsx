@@ -4,6 +4,7 @@
 import { useMemo, useState, type DragEvent } from "react";
 import { usePrefs, type WidgetPref } from "../state/prefs";
 import { Icon } from "../ui/Icon";
+import { withViewTransition } from "../ui/motion";
 import { WIDGETS } from "./widgets/registry";
 
 export function Dashboard() {
@@ -21,8 +22,10 @@ export function Dashboard() {
     [prefs.widgets],
   );
 
+  // Layout mutations run inside a view transition so widgets glide to
+  // their new positions instead of snapping.
   function setWidgets(widgets: WidgetPref[]) {
-    update({ widgets });
+    withViewTransition(() => update({ widgets }));
   }
 
   function patchWidget(id: string, patch: Partial<WidgetPref>) {
@@ -78,6 +81,7 @@ export function Dashboard() {
           return (
             <div
               key={w.id}
+              style={{ viewTransitionName: `widget-${w.id}` }}
               className={[
                 `card w-${w.size}`,
                 editing ? "widget-editing" : "",
@@ -138,7 +142,7 @@ export function Dashboard() {
       </div>
 
       {editing && hidden.length > 0 && (
-        <div className="card">
+        <div className="card fade-in-up">
           <div className="card-h">
             <span className="label">Hidden widgets</span>
           </div>

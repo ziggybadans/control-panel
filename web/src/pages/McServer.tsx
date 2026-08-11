@@ -7,6 +7,7 @@ import { useMCServer } from "../state/live";
 import { fmtBytes, fmtPct, fmtUptimeSince } from "../lib/format";
 import { Card, EmptyState, MCStateBadge, Spinner } from "../ui/bits";
 import { Icon } from "../ui/Icon";
+import { withViewTransition } from "../ui/motion";
 import { useMCActions } from "./mc/actions";
 import { ConsoleTab } from "./mc/ConsoleTab";
 import { PlayersTab } from "./mc/PlayersTab";
@@ -157,16 +158,19 @@ export function MCServerPage() {
             <button
               key={t}
               className={tab === t ? "tab active" : "tab"}
-              onClick={() => setTab(t)}
+              onClick={() => withViewTransition(() => setTab(t))}
             >
               {t}
+              {tab === t && <span className="tab-indicator" />}
             </button>
           ))}
         </div>
-        {tab === "Console" && <ConsoleTab id={id} state={server.state} />}
-        {tab === "Players" && <PlayersTab id={id} server={server} />}
-        {tab === "Backups" && <BackupsTab id={id} server={server} />}
-        {tab === "Settings" && <SettingsTab id={id} server={server} />}
+        <div className="tab-panel" key={tab}>
+          {tab === "Console" && <ConsoleTab id={id} state={server.state} />}
+          {tab === "Players" && <PlayersTab id={id} server={server} />}
+          {tab === "Backups" && <BackupsTab id={id} server={server} />}
+          {tab === "Settings" && <SettingsTab id={id} server={server} />}
+        </div>
       </div>
     </div>
   );

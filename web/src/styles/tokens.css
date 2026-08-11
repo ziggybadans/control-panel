@@ -11,6 +11,14 @@
   --r-card: 8px;
   --r-ctl: 6px;
 
+  /* Motion. Fast, decisive, ease-out biased — state changes should feel
+     immediate, not theatrical. */
+  --dur-1: 120ms; /* hovers, presses */
+  --dur-2: 200ms; /* reveals, tooltips, tab panels */
+  --dur-3: 320ms; /* page + modal entrances */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+
   /* Status palette (validated; never used for chart series). */
   --ok: #0ca30c;
   --warn: #fab219;

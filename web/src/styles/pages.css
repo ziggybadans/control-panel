@@ -15,6 +15,13 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  animation: login-in 380ms var(--ease-out);
+}
+@keyframes login-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
 }
 
 /* --- Dashboard ------------------------------------------------------------- */
@@ -155,6 +162,7 @@
 /* --- Console --------------------------------------------------------------- */
 
 .console-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: calc(100vh - var(--topbar-h) - 200px);
@@ -178,6 +186,16 @@
   border: 2px solid transparent;
   cursor: pointer;
   padding: 0;
+  transition:
+    transform var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+}
+.swatch:hover {
+  transform: scale(1.12);
+}
+.swatch:active {
+  transform: scale(0.95);
 }
 .swatch.selected {
   border-color: var(--text);
@@ -196,6 +214,10 @@
   color: var(--text-2);
   cursor: pointer;
   font-size: var(--fs);
+  transition:
+    background var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out);
 }
 .choice:hover {
   background: var(--surface-2);

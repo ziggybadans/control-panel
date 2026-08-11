@@ -96,6 +96,14 @@ button {
   flex-direction: column;
   gap: var(--gap);
   min-height: 100%;
+  animation: page-in var(--dur-3) var(--ease-out);
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 /* --- Utilities ------------------------------------------------------------ */
@@ -160,4 +168,27 @@ button {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-radius: 3px;
+}
+
+/* Motion is a garnish: anyone who asked the OS for less gets none, without
+   breaking end-state layout (near-zero duration instead of `none`). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* View transitions (dashboard re-layout, tab indicator): quick morphs. */
+::view-transition-group(*) {
+  animation-duration: 220ms;
+  animation-timing-function: var(--ease-inout);
 }

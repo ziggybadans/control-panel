@@ -359,9 +359,11 @@ export function JobPanel({
         )}
       </div>
       {expanded && (
-        <div className="job-output" style={{ marginTop: 6 }}>
-          {(full?.output ?? []).join("\n") || "waiting for output…"}
-          {job.err && `\n\nerror: ${job.err}`}
+        <div className="reveal" style={{ marginTop: 6 }}>
+          <div className="job-output">
+            {(full?.output ?? []).join("\n") || "waiting for output…"}
+            {job.err && `\n\nerror: ${job.err}`}
+          </div>
         </div>
       )}
     </div>

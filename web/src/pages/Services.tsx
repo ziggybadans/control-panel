@@ -175,7 +175,11 @@ function ServiceRow({
       {logsOpen && (
         <tr>
           <td colSpan={7} style={{ padding: 0, background: "var(--surface-2)" }}>
-            <LogDrawer unit={svc.unit} />
+            <div className="reveal">
+              <div>
+                <LogDrawer unit={svc.unit} />
+              </div>
+            </div>
           </td>
         </tr>
       )}

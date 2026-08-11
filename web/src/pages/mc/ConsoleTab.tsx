@@ -116,7 +116,7 @@ export function ConsoleTab({ id, state }: { id: string; state: MCState }) {
       </div>
       {!pinned && (
         <button
-          className="btn btn-sm"
+          className="btn btn-sm fade-in-up"
           style={{ position: "absolute", right: 24, bottom: 64 }}
           onClick={() => {
             setPinned(true);
