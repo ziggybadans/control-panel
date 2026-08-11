@@ -1,0 +1,10 @@
+# Development config — mock providers, no auth, local data dir.
+listen: "127.0.0.1:9090"
+data_dir: "./data"
+
+auth:
+  mode: none # NEVER use on a real deployment
+
+metrics:
+  interval_ms: 1000
+  history: 600
