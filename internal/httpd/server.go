@@ -64,6 +64,7 @@ func (s *Server) routes() {
 
 	// System.
 	m.HandleFunc("GET /api/system", s.handleSystem)
+	m.HandleFunc("GET /api/summary", s.handleSummary)
 	m.HandleFunc("GET /api/metrics/history", s.handleMetricsHistory)
 	m.HandleFunc("GET /api/events", s.handleEvents)
 

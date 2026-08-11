@@ -27,6 +27,17 @@ release: ui ## static linux/amd64 binary for the Debian server
 		go build -trimpath -ldflags '$(LDFLAGS)' \
 		-o dist/control-panel-linux-amd64 ./cmd/control-panel
 
+## macOS menu bar app --------------------------------------------------------
+
+mac-bar: ## build the menu bar companion (dist/Panel Bar.app)
+	cd macbar && swift build -c release
+	rm -rf "dist/Panel Bar.app"
+	mkdir -p "dist/Panel Bar.app/Contents/MacOS"
+	cp macbar/.build/release/PanelBar "dist/Panel Bar.app/Contents/MacOS/PanelBar"
+	cp macbar/Info.plist "dist/Panel Bar.app/Contents/Info.plist"
+	codesign --force --sign - "dist/Panel Bar.app"
+	@echo 'Built dist/Panel Bar.app — copy to /Applications and open it.'
+
 ## Quality -------------------------------------------------------------------
 
 test:

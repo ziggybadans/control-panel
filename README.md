@@ -40,6 +40,9 @@ systemd service; accessed from any browser on the LAN.
   density, dark & light themes. Preferences stored server-side, so they follow
   you across machines.
 - **Audit log** — every action recorded with timestamp, IP, and outcome.
+- **macOS menu bar app** — a native companion (`macbar/`) showing CPU,
+  memory, pool usage, Minecraft players, Plex streams, and health warnings
+  at a glance; password in the Keychain, one click to the full panel.
 
 ## Safety model
 
@@ -84,6 +87,7 @@ configuration reference, and `deploy/config.example.yaml` for every option.
 make dev        # backend in mock mode on :9090 + Vite dev server on :5173
 make test       # Go unit tests + frontend type-check
 make build      # production build for the host platform
+make mac-bar    # macOS menu bar companion -> dist/Panel Bar.app
 ```
 
 Mock mode (`--mock`) serves realistic synthetic data for every subsystem, so
