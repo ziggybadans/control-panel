@@ -5,7 +5,8 @@
       "name": "panel-mock",
       "runtimeExecutable": "./bin/control-panel",
       "runtimeArgs": ["--mock", "--config", "deploy/config.dev.yaml"],
-      "port": 9090
+      "port": 9090,
+      "autoPort": false
     }
   ]
 }
