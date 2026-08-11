@@ -32,15 +32,33 @@
 }
 
 .nav {
+  position: relative; /* anchor for the sliding active indicator */
   display: flex;
   flex-direction: column;
   padding: 10px 8px;
   gap: 1px;
 }
+
+/* One shared highlight that glides to the active item on navigation. */
+.nav-indicator {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 0;
+  border-radius: var(--r-ctl);
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+  pointer-events: none;
+  transition:
+    transform var(--dur-2) var(--ease-out),
+    height var(--dur-2) var(--ease-out);
+}
 .nav .label {
   padding: 10px 10px 4px;
 }
 .nav-item {
+  position: relative; /* sit above the sliding indicator */
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -51,18 +69,19 @@
   cursor: pointer;
   transition:
     background var(--dur-1) var(--ease-out),
-    color var(--dur-1) var(--ease-out),
-    border-color var(--dur-1) var(--ease-out);
+    color var(--dur-1) var(--ease-out);
+}
+.nav-item:hover:not(.active) {
+  background: var(--surface-2);
 }
 .nav-item:hover {
-  background: var(--surface-2);
   color: var(--text);
   text-decoration: none;
 }
+/* The indicator carries the background + accent bar; the item itself only
+   changes ink so the highlight can slide independently. */
 .nav-item.active {
-  background: var(--accent-soft);
   color: var(--text);
-  border-left-color: var(--accent);
 }
 .nav-item .icon {
   color: var(--text-3);
@@ -103,6 +122,13 @@
   font-size: var(--fs-lg);
   font-weight: 650;
   letter-spacing: -0.01em;
+  animation: title-in var(--dur-2) var(--ease-out);
+}
+@keyframes title-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
 }
 .topbar .crumb {
   color: var(--text-3);

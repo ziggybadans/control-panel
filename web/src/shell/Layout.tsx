@@ -1,5 +1,6 @@
 // App shell: sidebar navigation + topbar + content outlet.
 
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useConnState, useJobs, useMCServers, useServices } from "../state/live";
 import { useSystem } from "../state/system";
@@ -44,6 +45,23 @@ export function Layout() {
     TITLES[location.pathname] ??
     (location.pathname.startsWith("/minecraft/") ? "Minecraft" : "Control Panel");
 
+  // Sliding active-item indicator: measured from the DOM so it tracks any
+  // density/layout change, animated with transform only.
+  const navRef = useRef<HTMLElement | null>(null);
+  const [marker, setMarker] = useState<{ y: number; h: number } | null>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const measure = () => {
+      const active = nav.querySelector<HTMLElement>(".nav-item.active");
+      setMarker(active ? { y: active.offsetTop, h: active.offsetHeight } : null);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(nav);
+    return () => ro.disconnect();
+  }, [location.pathname]);
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -54,7 +72,13 @@ export function Layout() {
             <div className="sub">{info?.os ?? "control panel"}</div>
           </div>
         </div>
-        <nav className="nav">
+        <nav className="nav" ref={navRef}>
+          {marker && (
+            <div
+              className="nav-indicator"
+              style={{ transform: `translateY(${marker.y}px)`, height: marker.h }}
+            />
+          )}
           {NAV.map((item) => (
             <NavLink
               key={item.to}
@@ -97,7 +121,8 @@ export function Layout() {
       </aside>
       <div className="main">
         <header className="topbar">
-          <h1>{title}</h1>
+          {/* Keyed so the title replays its entrance on page change. */}
+          <h1 key={title}>{title}</h1>
           <TopbarStatus />
         </header>
         <div className="content">
