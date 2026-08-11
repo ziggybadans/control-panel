@@ -1,0 +1,91 @@
+# control-panel configuration reference.
+# Copy to /etc/control-panel/config.yaml and adjust.
+# Every key is optional; the values shown are the defaults unless noted.
+
+# Address the panel listens on. Keep it LAN-only (or bind 127.0.0.1 and put
+# a reverse proxy/tailscale in front).
+listen: "0.0.0.0:9090"
+
+# Runtime state: sessions, audit log, UI preferences, minecraft overrides.
+data_dir: /var/lib/control-panel
+
+auth:
+  # "password" (default) or "none". "none" disables login entirely — only
+  # for networks where every device is trusted.
+  mode: password
+  # Generate with:  control-panel hash
+  password_hash: ""
+  # How long a login stays valid.
+  session_hours: 168
+
+# Optional direct TLS. Alternatively terminate TLS at a reverse proxy.
+tls:
+  cert: ""
+  key: ""
+
+metrics:
+  # Sampling period while a browser is connected (ms). The sampler slows to
+  # 10s automatically when nobody is watching.
+  interval_ms: 1000
+  # Points kept for charts (600 x 1s = 10 minutes).
+  history: 600
+
+storage:
+  # mergerfs mount points. Empty = auto-detect every fuse.mergerfs mount.
+  pools: []
+  # Poll SMART via smartctl (apt install smartmontools). Standby drives are
+  # never woken (-n standby).
+  smart: true
+  # Hide mounts from the panel.
+  exclude_mounts: []
+  snapraid:
+    # Path to snapraid.conf; empty disables the integration.
+    # When you add snapraid later, set this and restart the panel.
+    config: ""
+    # Explicit binary path if not on $PATH.
+    binary: ""
+
+services:
+  # systemd units the panel may view and control. Anything not listed is
+  # untouchable. Empty list = a sensible default set (plex, smbd, sshd,
+  # docker, tailscaled, snapraid-sync.timer), showing only units that exist.
+  units: []
+  #  - plexmediaserver.service
+  #  - smbd.service
+  #  - sshd.service
+  #  - snapraid-sync.timer
+  # Set false to make the services page read-only.
+  allow_actions: true
+
+plex:
+  url: "http://127.0.0.1:32400"
+  # X-Plex-Token — grab it from any Plex Web request. Empty disables the
+  # Plex page (service control still works via services).
+  token: ""
+
+minecraft:
+  # Every subdirectory containing a server jar / run.sh becomes a managed
+  # server; the directory name is its id.
+  root: /srv/minecraft
+  # Default java executable (per-server override below).
+  java: java
+  # Where backups are written (default <root>/.backups).
+  backup_dir: ""
+  # Restart servers that were running when the panel last shut down.
+  resume: true
+  # Per-server settings, keyed by directory name. The UI can adjust
+  # mem/flags/autostart too (stored in data_dir, layered over these).
+  servers: {}
+  #  survival:
+  #    mem: 6G            # -Xms/-Xmx
+  #    aikar: true        # Aikar GC flags (recommended for Paper)
+  #    autostart: true    # start with the panel
+  #    auto_restart: true # relaunch after a crash (max 3 in 10 min)
+  #  atm10:
+  #    mem: 10G
+  #    jar: neoforge-launcher.jar   # override jar auto-detection
+  #    jvm_args: ["-Dfml.readTimeout=180"]
+
+power:
+  # Enable the reboot/shutdown endpoints (typed confirmation still required).
+  allow: false

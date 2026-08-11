@@ -1,0 +1,40 @@
+# systemd unit for control-panel.
+# The panel runs as root: it manages systemd units, reads SMART data, and
+# supervises game servers. Its attack surface is constrained by design
+# (allowlist-only exec, mandatory auth, server-side confirmations) and the
+# hardening below removes what it doesn't need.
+
+[Unit]
+Description=Server control panel
+Documentation=https://github.com/ziggybadans/control-panel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/control-panel --config /etc/control-panel/config.yaml
+Restart=on-failure
+RestartSec=3
+
+# Give Minecraft servers time to save and exit on panel shutdown.
+TimeoutStopSec=180
+KillMode=control-group
+
+# Hardening (keep compatible with: systemctl calls, /proc, /sys, smartctl,
+# game server dirs, and the data dir).
+NoNewPrivileges=false
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+SystemCallArchitectures=native
+
+# Resource guard: the panel itself stays tiny; the (unlimited) game servers
+# run in this cgroup too, so set this to what you can spare for games+panel.
+# MemoryMax=16G
+
+[Install]
+WantedBy=multi-user.target
