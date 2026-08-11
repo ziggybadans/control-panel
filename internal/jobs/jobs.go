@@ -153,7 +153,7 @@ func (r *Runner) Current() *View {
 func (r *Runner) List() []View {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var out []View
+	out := []View{}
 	if r.current != nil {
 		out = append(out, r.current.view(false))
 	}
