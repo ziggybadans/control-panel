@@ -43,7 +43,7 @@ func testServer(t *testing.T, authMode string) *Server {
 		Services: services.NewMockProvider(),
 		Plex:     plex.NewMockProvider(),
 		Apps:     apps.NewMockProvider(),
-		MC:       mc.NewMockService(bus, runner),
+		MC:       mc.NewMockService(bus, runner, dir),
 	})
 }
 

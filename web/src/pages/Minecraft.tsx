@@ -1,6 +1,7 @@
 // Minecraft server list: one card per server with live vitals and quick
 // lifecycle actions.
 
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMCServers } from "../state/live";
 import type { MCServer } from "../api/types";
@@ -8,12 +9,24 @@ import { fmtBytes, fmtPct, fmtUptimeSince } from "../lib/format";
 import { Card, EmptyState, MCStateBadge } from "../ui/bits";
 import { Icon } from "../ui/Icon";
 import { useMCActions } from "./mc/actions";
+import { SetupModal } from "./mc/SetupModal";
 
 export function MinecraftPage() {
   const servers = useMCServers();
+  const [setupOpen, setSetupOpen] = useState(false);
 
   return (
     <div className="page">
+      <div className="row">
+        <span className="small muted">
+          {servers.length} server{servers.length === 1 ? "" : "s"}
+        </span>
+        <button className="btn btn-sm btn-primary right" onClick={() => setSetupOpen(true)}>
+          <Icon name="plus" size={12} />
+          New server
+        </button>
+      </div>
+      {setupOpen && <SetupModal onClose={() => setSetupOpen(false)} />}
       {servers.length === 0 ? (
         <Card title="Servers">
           <EmptyState

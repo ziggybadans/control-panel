@@ -3,6 +3,7 @@
 package mc
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 
@@ -91,6 +92,41 @@ type ConfigPatch struct {
 	AutoStart   *bool   `json:"autoStart,omitempty"`
 	AutoRestart *bool   `json:"autoRestart,omitempty"`
 	JVMArgs     *string `json:"jvmArgs,omitempty"` // space-separated
+	Jar         *string `json:"jar,omitempty"`     // set by jar updates
+}
+
+// CreateSpec describes a new server for the setup flow.
+type CreateSpec struct {
+	ID         string `json:"id"`
+	Flavor     string `json:"flavor"` // paper | purpur | vanilla | fabric
+	Version    string `json:"version"`
+	Mem        string `json:"mem"`
+	Port       int    `json:"port"`
+	MOTD       string `json:"motd"`
+	AcceptEULA bool   `json:"acceptEula"`
+}
+
+var ValidFlavors = map[string]bool{
+	"paper": true, "purpur": true, "vanilla": true, "fabric": true,
+}
+
+func (s *CreateSpec) Validate() error {
+	if err := CheckID(s.ID); err != nil {
+		return err
+	}
+	if !ValidFlavors[s.Flavor] {
+		return fmt.Errorf("invalid flavor %q (paper, purpur, vanilla, fabric)", s.Flavor)
+	}
+	if s.Version == "" {
+		return fmt.Errorf("version is required")
+	}
+	if s.Port < 1024 || s.Port > 65535 {
+		return fmt.Errorf("port must be between 1024 and 65535")
+	}
+	if s.Mem != "" && parseMem(s.Mem) == 0 {
+		return fmt.Errorf("invalid memory value %q (use e.g. 4G)", s.Mem)
+	}
+	return nil
 }
 
 // PlayerActions maps UI actions to console commands. Player names are
@@ -162,4 +198,17 @@ type Service interface {
 
 	UpdateConfig(id string, patch ConfigPatch) error
 	Rescan() error
+
+	// Dir exposes the server's directory for file management (the HTTP
+	// layer runs mcfiles operations against it).
+	Dir(id string) (string, error)
+
+	// CreateServer provisions a new server directory and downloads the
+	// selected server jar (runs as a job).
+	CreateServer(spec CreateSpec) (*jobs.View, error)
+	// UpdateJar downloads a new server jar into an existing server and
+	// switches the launch configuration to it (runs as a job).
+	UpdateJar(id, flavor, version string) (*jobs.View, error)
+	// Versions lists available game versions for a flavor (newest first).
+	Versions(ctx context.Context, flavor string) ([]string, error)
 }

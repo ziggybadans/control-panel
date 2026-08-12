@@ -16,8 +16,9 @@ import (
 // mockService simulates several Minecraft servers with live consoles so the
 // full UI can be exercised without Java or a Linux host.
 type mockService struct {
-	bus    *events.Bus
-	runner *jobs.Runner
+	bus     *events.Bus
+	runner  *jobs.Runner
+	dataDir string
 
 	mu      sync.Mutex
 	servers map[string]*mockServer
@@ -36,8 +37,8 @@ type mockServer struct {
 
 var mockPlayers = []string{"Draxx", "moonpetal", "TerraFirma_", "quills", "BlockbyBlock", "Astris"}
 
-func NewMockService(bus *events.Bus, runner *jobs.Runner) Service {
-	m := &mockService{bus: bus, runner: runner, servers: map[string]*mockServer{}}
+func NewMockService(bus *events.Bus, runner *jobs.Runner, dataDir string) Service {
+	m := &mockService{bus: bus, runner: runner, dataDir: dataDir, servers: map[string]*mockServer{}}
 
 	survival := &mockServer{
 		info: ServerInfo{

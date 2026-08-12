@@ -5,18 +5,127 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api/client";
 import type { MCServer, PropEntry } from "../../api/types";
+import { useJobs } from "../../state/live";
 import { Spinner, Toggle } from "../../ui/bits";
 import { useConfirm } from "../../ui/Confirm";
 import { Icon } from "../../ui/Icon";
 import { useToast } from "../../ui/Toast";
+import { JobPanel } from "../Storage";
 
 export function SettingsTab({ id, server }: { id: string; server: MCServer }) {
   return (
     <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: "var(--gap)" }}>
       {!server.eulaAccepted && <EulaSection id={id} />}
       <LaunchSection id={id} server={server} />
+      <JarSection id={id} server={server} />
       <PropertiesSection id={id} serverState={server.state} />
     </div>
+  );
+}
+
+const JAR_FLAVORS = ["paper", "purpur", "fabric", "vanilla"];
+
+function JarSection({ id, server }: { id: string; server: MCServer }) {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const jobs = useJobs();
+  const [flavor, setFlavor] = useState(
+    JAR_FLAVORS.includes((server.software ?? "").toLowerCase())
+      ? (server.software ?? "").toLowerCase()
+      : "paper",
+  );
+  const [version, setVersion] = useState("");
+
+  const { data: versions } = useQuery({
+    queryKey: ["mc-versions", flavor],
+    queryFn: () =>
+      api<{ versions: string[] }>(`/api/minecraft/meta/versions?flavor=${flavor}`),
+    staleTime: 3600_000,
+  });
+  const selected = version || versions?.versions?.[0] || "";
+  const jarJob = jobs.find((j) => j.kind === "mc.jar" && j.target === id);
+  const [showJob, setShowJob] = useState(false);
+
+  async function update() {
+    const ok = await confirm({
+      title: `Update ${id} to ${flavor} ${selected}`,
+      target: id,
+      body: (
+        <>
+          The panel downloads the official {flavor} {selected} server jar into the
+          server folder and switches the launch configuration to it. The current jar
+          stays on disk for rollback. Back up first if this is a major version jump —
+          world upgrades are one-way.
+        </>
+      ),
+      confirmLabel: "Download & switch",
+    });
+    if (!ok) return;
+    try {
+      await api(`/api/minecraft/${id}/jar`, {
+        method: "POST",
+        body: { flavor, version: selected },
+        confirm: id,
+      });
+      setShowJob(true);
+      toast("ok", "jar update started");
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "update failed");
+    }
+  }
+
+  return (
+    <section>
+      <div className="row" style={{ marginBottom: 8 }}>
+        <span className="label">Server jar</span>
+        <span className="small faint mono">{server.jar || "run.sh"}</span>
+      </div>
+      <div className="row wrap" style={{ gap: 8 }}>
+        <div className="choice-row">
+          {JAR_FLAVORS.map((f) => (
+            <button
+              key={f}
+              className={`choice ${flavor === f ? "selected" : ""}`}
+              onClick={() => {
+                setFlavor(f);
+                setVersion("");
+              }}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        <select
+          className="select mono"
+          value={selected}
+          onChange={(e) => setVersion(e.target.value)}
+        >
+          {(versions?.versions ?? []).slice(0, 30).map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+        <button
+          className="btn btn-sm btn-primary"
+          disabled={!selected || jarJob?.state === "running"}
+          onClick={update}
+        >
+          <Icon name="download" size={12} />
+          Update jar
+        </button>
+        <span className="small faint">applies on next start · a jar can also be uploaded in Files</span>
+      </div>
+      {jarJob && (
+        <div style={{ marginTop: 8 }}>
+          <JobPanel
+            job={jarJob}
+            expanded={showJob || jarJob.state === "running"}
+            onToggle={() => setShowJob(!showJob)}
+          />
+        </div>
+      )}
+    </section>
   );
 }
 

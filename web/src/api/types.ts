@@ -262,6 +262,45 @@ export interface AppsResponse {
   apps: AppStatus[] | null;
 }
 
+// Minecraft file manager / addons / map / setup
+
+export interface FileEntry {
+  name: string;
+  dir: boolean;
+  size: number;
+  modTime: number;
+}
+
+export interface FilesResponse {
+  path: string;
+  entries: FileEntry[] | null;
+}
+
+export interface Addon {
+  file: string;
+  dir: string; // "plugins" | "mods"
+  name: string;
+  version?: string;
+  enabled: boolean;
+  sizeBytes: number;
+}
+
+export interface MapInfo {
+  detected: boolean;
+  type?: string;
+  port?: number;
+}
+
+export interface MCCreateSpec {
+  id: string;
+  flavor: string;
+  version: string;
+  mem: string;
+  port: number;
+  motd: string;
+  acceptEula: boolean;
+}
+
 // Jobs / audit
 
 export interface Job {

@@ -89,6 +89,16 @@ func (s *Server) routes() {
 	// Minecraft.
 	m.HandleFunc("GET /api/minecraft", s.handleMCList)
 	m.HandleFunc("POST /api/minecraft/rescan", s.handleMCRescan)
+	m.HandleFunc("POST /api/minecraft/create", s.handleMCCreate)
+	m.HandleFunc("GET /api/minecraft/meta/versions", s.handleMCVersions)
+	m.HandleFunc("GET /api/minecraft/{id}/files", s.handleMCFilesList)
+	m.HandleFunc("POST /api/minecraft/{id}/files/op", s.handleMCFilesOp)
+	m.HandleFunc("GET /api/minecraft/{id}/files/download", s.handleMCFilesDownload)
+	m.HandleFunc("POST /api/minecraft/{id}/files/upload", s.handleMCFilesUpload)
+	m.HandleFunc("GET /api/minecraft/{id}/addons", s.handleMCAddons)
+	m.HandleFunc("POST /api/minecraft/{id}/addons/toggle", s.handleMCAddonToggle)
+	m.HandleFunc("GET /api/minecraft/{id}/map", s.handleMCMap)
+	m.HandleFunc("POST /api/minecraft/{id}/jar", s.handleMCJar)
 	m.HandleFunc("GET /api/minecraft/{id}", s.handleMCGet)
 	m.HandleFunc("POST /api/minecraft/{id}/{verb}", s.handleMCLifecycle)
 	m.HandleFunc("POST /api/minecraft/{id}/command", s.handleMCCommand)
@@ -165,9 +175,13 @@ func securityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "same-origin")
+		// frame-src allows embedding server map UIs (Dynmap/BlueMap/…)
+		// hosted on the same machine; frame-ancestors still forbids anyone
+		// from embedding the panel itself.
 		h.Set("Content-Security-Policy",
 			"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "+
-				"img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+				"img-src 'self' data:; connect-src 'self'; frame-src http: https:; "+
+				"frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
 	})
 }

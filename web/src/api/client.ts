@@ -57,3 +57,27 @@ export async function api<T>(path: string, opts: Options = {}): Promise<T> {
   }
   return data as T;
 }
+
+/** Multipart file upload (used by the Minecraft file manager). */
+export async function apiUpload<T>(path: string, files: File[]): Promise<T> {
+  const form = new FormData();
+  for (const f of files) form.append("files", f, f.name);
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "X-CP": "1" },
+    body: form,
+    credentials: "same-origin",
+  });
+  const data = (await res.json().catch(() => null)) as unknown;
+  if (res.status === 401) {
+    throw new ApiError(401, "authentication required");
+  }
+  if (!res.ok) {
+    const msg =
+      data && typeof data === "object" && "error" in data
+        ? String((data as { error: unknown }).error)
+        : res.statusText;
+    throw new ApiError(res.status, msg);
+  }
+  return data as T;
+}

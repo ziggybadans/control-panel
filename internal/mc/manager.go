@@ -24,6 +24,7 @@ type Manager struct {
 	dataDir string
 	bus     *events.Bus
 	runner  *jobs.Runner
+	fetch   *fetcher
 
 	mu        sync.Mutex
 	instances map[string]*instance
@@ -36,6 +37,7 @@ func NewManager(cfg config.Minecraft, dataDir string, bus *events.Bus, runner *j
 		dataDir:   dataDir,
 		bus:       bus,
 		runner:    runner,
+		fetch:     newFetcher(),
 		instances: map[string]*instance{},
 		overrides: map[string]ConfigPatch{},
 	}
@@ -146,6 +148,13 @@ func (m *Manager) resolveCfgLocked(id, dir string) resolvedCfg {
 		}
 		if ov.JVMArgs != nil {
 			rc.JVMArgs = strings.Fields(*ov.JVMArgs)
+		}
+		// A panel-managed jar choice (setup/update) wins if the file exists.
+		if ov.Jar != nil && *ov.Jar != "" {
+			if _, err := os.Stat(filepath.Join(dir, *ov.Jar)); err == nil {
+				rc.Jar = *ov.Jar
+				rc.RunScript = ""
+			}
 		}
 	}
 	return rc
@@ -585,6 +594,9 @@ func (m *Manager) UpdateConfig(id string, patch ConfigPatch) error {
 	}
 	if patch.JVMArgs != nil {
 		cur.JVMArgs = patch.JVMArgs
+	}
+	if patch.Jar != nil {
+		cur.Jar = patch.Jar
 	}
 	m.overrides[id] = cur
 	m.saveOverridesLocked()

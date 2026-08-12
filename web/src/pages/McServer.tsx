@@ -11,10 +11,13 @@ import { withViewTransition } from "../ui/motion";
 import { useMCActions } from "./mc/actions";
 import { ConsoleTab } from "./mc/ConsoleTab";
 import { PlayersTab } from "./mc/PlayersTab";
+import { FilesTab } from "./mc/FilesTab";
+import { AddonsTab } from "./mc/AddonsTab";
 import { BackupsTab } from "./mc/BackupsTab";
+import { MapTab } from "./mc/MapTab";
 import { SettingsTab } from "./mc/SettingsTab";
 
-const TABS = ["Console", "Players", "Backups", "Settings"] as const;
+const TABS = ["Console", "Players", "Files", "Addons", "Backups", "Map", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
 export function MCServerPage() {
@@ -168,7 +171,10 @@ export function MCServerPage() {
         <div className="tab-panel" key={tab}>
           {tab === "Console" && <ConsoleTab id={id} state={server.state} />}
           {tab === "Players" && <PlayersTab id={id} server={server} />}
+          {tab === "Files" && <FilesTab id={id} />}
+          {tab === "Addons" && <AddonsTab id={id} server={server} />}
           {tab === "Backups" && <BackupsTab id={id} server={server} />}
+          {tab === "Map" && <MapTab id={id} server={server} />}
           {tab === "Settings" && <SettingsTab id={id} server={server} />}
         </div>
       </div>

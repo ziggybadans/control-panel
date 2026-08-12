@@ -39,7 +39,13 @@ systemd service; accessed from any browser on the LAN.
   kill), live console with command input, player management (kick / ban / op,
   whitelist), `server.properties` editor that preserves comments, JVM / memory
   configuration, tar.gz backups with restore, EULA handling, crash detection
-  with optional auto-restart.
+  with optional auto-restart. Plus: one-click **server setup** (Paper / Purpur /
+  Fabric / Vanilla, official jars downloaded with streamed progress), a
+  **file manager** confined to each server's directory (browse, rename/move,
+  upload with drag-drop, download, zip/unzip, delete), a **plugins/mods
+  manager** with metadata read from the jars and enable/disable toggles,
+  **server jar updates** with rollback, and an embedded **map viewer** when
+  Dynmap / BlueMap / squaremap / Pl3xMap is installed.
 - **Customizable dashboard** — reorder / resize / hide widgets, accent color,
   density, dark & light themes. Preferences stored server-side, so they follow
   you across machines.
