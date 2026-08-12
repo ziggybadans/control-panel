@@ -118,6 +118,21 @@ struct PanelView: View {
                     }
                 }
 
+                if s.appsConfigured == true {
+                    sectionLabel("MEDIA APPS")
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.down.circle").font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Text(appsLine(s)).font(.system(size: 12))
+                        Spacer()
+                        if let issues = s.appsIssues, issues > 0 {
+                            Label("\(issues)", systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                }
+
                 if let job = s.jobRunning {
                     Label(job, systemImage: "gearshape.arrow.triangle.2.circlepath")
                         .font(.system(size: 11))
@@ -169,6 +184,13 @@ struct PanelView: View {
         .controlSize(.small)
         .font(.system(size: 12))
         .padding(.horizontal, 12).padding(.vertical, 8)
+    }
+
+    private func appsLine(_ s: Summary) -> String {
+        var parts: [String] = []
+        if let q = s.appsQueue, q > 0 { parts.append("\(q) downloading") }
+        if let p = s.requestsPending, p > 0 { parts.append("\(p) request\(p == 1 ? "" : "s") pending") }
+        return parts.isEmpty ? "idle" : parts.joined(separator: " · ")
     }
 
     private func mcColor(_ state: String) -> Color {

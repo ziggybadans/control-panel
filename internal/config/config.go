@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -22,8 +23,20 @@ type Config struct {
 	Storage   Storage   `yaml:"storage"`
 	Services  Services  `yaml:"services"`
 	Plex      Plex      `yaml:"plex"`
+	Apps      []App     `yaml:"apps"`
 	Minecraft Minecraft `yaml:"minecraft"`
 	Power     Power     `yaml:"power"`
+}
+
+// App is one media-stack integration (Radarr, Sonarr, Overseerr, …).
+type App struct {
+	// Name shown in the UI (defaults to the capitalized type).
+	Name string `yaml:"name"`
+	// Type selects the API dialect: radarr | sonarr | lidarr | readarr |
+	// whisparr | prowlarr | overseerr | jellyseerr.
+	Type   string `yaml:"type"`
+	URL    string `yaml:"url"`
+	APIKey string `yaml:"api_key"`
 }
 
 type Auth struct {
@@ -185,7 +198,25 @@ func (c *Config) validate() error {
 	if c.Minecraft.Java == "" {
 		c.Minecraft.Java = "java"
 	}
+	for i := range c.Apps {
+		app := &c.Apps[i]
+		if !ValidAppTypes[app.Type] {
+			return fmt.Errorf("apps[%d]: unknown type %q (valid: radarr, sonarr, lidarr, readarr, whisparr, prowlarr, overseerr, jellyseerr)", i, app.Type)
+		}
+		if app.URL == "" {
+			return fmt.Errorf("apps[%d] (%s): url is required", i, app.Type)
+		}
+		if app.Name == "" {
+			app.Name = strings.ToUpper(app.Type[:1]) + app.Type[1:]
+		}
+	}
 	return nil
+}
+
+// ValidAppTypes is the set of supported media-stack integrations.
+var ValidAppTypes = map[string]bool{
+	"radarr": true, "sonarr": true, "lidarr": true, "readarr": true,
+	"whisparr": true, "prowlarr": true, "overseerr": true, "jellyseerr": true,
 }
 
 // SessionTTL returns the configured session lifetime.

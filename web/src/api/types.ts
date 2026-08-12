@@ -225,6 +225,43 @@ export interface PlayerInfo {
   banned: NamedPlayer[] | null;
 }
 
+// Media apps (*arr suite, Overseerr/Jellyseerr)
+
+export interface AppQueueItem {
+  title: string;
+  status: string;
+  progress: number;
+  timeLeft?: string;
+}
+
+export interface AppRequestCounts {
+  pending: number;
+  approved: number;
+  processing: number;
+  available: number;
+  total: number;
+}
+
+export interface AppStatus {
+  name: string;
+  type: string;
+  url: string;
+  reachable: boolean;
+  error?: string;
+  version?: string;
+  healthIssues: string[];
+  queueCount: number;
+  queue: AppQueueItem[];
+  missing?: number;
+  upcomingWeek?: number;
+  requests?: AppRequestCounts;
+}
+
+export interface AppsResponse {
+  configured: boolean;
+  apps: AppStatus[] | null;
+}
+
 // Jobs / audit
 
 export interface Job {

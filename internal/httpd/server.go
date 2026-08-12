@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ziggybadans/control-panel/internal/apps"
 	"github.com/ziggybadans/control-panel/internal/audit"
 	"github.com/ziggybadans/control-panel/internal/auth"
 	"github.com/ziggybadans/control-panel/internal/config"
@@ -37,6 +38,7 @@ type Deps struct {
 	Storage  storage.Provider
 	Services services.Provider
 	Plex     plex.Provider
+	Apps     apps.Provider
 	MC       mc.Service
 	// Power executes "reboot" or "shutdown" (nil = unsupported platform).
 	Power func(action string) error
@@ -80,6 +82,9 @@ func (s *Server) routes() {
 
 	// Plex.
 	m.HandleFunc("GET /api/plex", s.handlePlex)
+
+	// Media apps (*arr suite, Overseerr/Jellyseerr).
+	m.HandleFunc("GET /api/apps", s.handleApps)
 
 	// Minecraft.
 	m.HandleFunc("GET /api/minecraft", s.handleMCList)

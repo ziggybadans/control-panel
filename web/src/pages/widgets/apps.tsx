@@ -4,7 +4,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
-import type { PlexStatus, StorageOverview } from "../../api/types";
+import type { AppsResponse, PlexStatus, StorageOverview } from "../../api/types";
 import { fmtBytes, fmtPct, fmtTemp } from "../../lib/format";
 import { useLatestMetrics, useMCServers, useServices } from "../../state/live";
 import { useSystem } from "../../state/system";
@@ -190,6 +190,58 @@ export function MinecraftWidget() {
       {servers.length === 0 && (
         <div className="small faint">No Minecraft servers discovered.</div>
       )}
+    </div>
+  );
+}
+
+// --- Media apps -------------------------------------------------------------
+
+export function MediaAppsWidget() {
+  const { data } = useQuery({
+    queryKey: ["apps"],
+    queryFn: () => api<AppsResponse>("/api/apps"),
+    refetchInterval: 15_000,
+  });
+  const apps = data?.apps ?? [];
+  if (!data?.configured) {
+    return (
+      <div className="small faint">
+        Not configured — list your apps under <span className="mono">apps:</span> in
+        config.yaml.
+      </div>
+    );
+  }
+  return (
+    <div className="mini-rows">
+      {apps.map((app) => {
+        const issues = (app.healthIssues ?? []).length;
+        return (
+          <Link
+            key={`${app.type}-${app.name}`}
+            to="/apps"
+            className="mini-row"
+            style={{ color: "inherit", textDecoration: "none" }}
+          >
+            <span
+              className={`dot ${app.reachable ? (issues > 0 ? "warn" : "ok") : "crit"}`}
+            />
+            <span style={{ fontWeight: 550 }}>{app.name}</span>
+            <span className="right small muted num">
+              {!app.reachable
+                ? "unreachable"
+                : app.requests
+                  ? app.requests.pending > 0
+                    ? `${app.requests.pending} pending`
+                    : "no requests"
+                  : app.queueCount > 0
+                    ? `${app.queueCount} downloading`
+                    : issues > 0
+                      ? `${issues} issue${issues > 1 ? "s" : ""}`
+                      : "idle"}
+            </span>
+          </Link>
+        );
+      })}
     </div>
   );
 }

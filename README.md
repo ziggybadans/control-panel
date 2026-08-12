@@ -31,6 +31,10 @@ systemd service; accessed from any browser on the LAN.
   restart, journal tail.
 - **Plex** — active sessions (with transcode indicator), library statistics,
   service control.
+- **Media apps** — Radarr / Sonarr / Lidarr / Readarr / Prowlarr and
+  Overseerr / Jellyseerr: download queues with live progress, health
+  warnings, missing and upcoming counts, pending requests. Read-only —
+  API keys never leave the server; one click opens each app's own UI.
 - **Minecraft** — multiple servers, full lifecycle (start / stop / restart /
   kill), live console with command input, player management (kick / ban / op,
   whitelist), `server.properties` editor that preserves comments, JVM / memory

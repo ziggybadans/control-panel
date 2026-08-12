@@ -38,6 +38,12 @@ func (s *Server) handleSummary(w http.ResponseWriter, r *http.Request) {
 		PlexConfigured bool        `json:"plexConfigured"`
 		PlexStreams    int         `json:"plexStreams"`
 
+		// Media apps rollup (0 when none are configured).
+		AppsConfigured  bool `json:"appsConfigured"`
+		AppsQueue       int  `json:"appsQueue"`
+		AppsIssues      int  `json:"appsIssues"` // health issues + unreachable apps
+		RequestsPending int  `json:"requestsPending"`
+
 		JobRunning string `json:"jobRunning,omitempty"` // "kind target"
 	}
 
@@ -92,6 +98,20 @@ func (s *Server) handleSummary(w http.ResponseWriter, r *http.Request) {
 	plexStatus := s.Plex.Status(r.Context())
 	out.PlexConfigured = plexStatus.Configured
 	out.PlexStreams = len(plexStatus.Sessions)
+
+	if s.Apps.Configured() {
+		out.AppsConfigured = true
+		for _, app := range s.Apps.List(r.Context()) {
+			out.AppsQueue += app.QueueCount
+			out.AppsIssues += len(app.HealthIssues)
+			if !app.Reachable {
+				out.AppsIssues++
+			}
+			if app.Requests != nil {
+				out.RequestsPending += app.Requests.Pending
+			}
+		}
+	}
 
 	if job := s.Jobs.Current(); job != nil {
 		out.JobRunning = job.Kind + " " + job.Target

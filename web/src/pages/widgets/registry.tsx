@@ -11,6 +11,7 @@ import {
   NetworkWidget,
 } from "./metrics";
 import {
+  MediaAppsWidget,
   MinecraftWidget,
   PlexWidget,
   ServicesWidget,
@@ -36,4 +37,5 @@ export const WIDGETS: Record<string, WidgetDef> = {
   minecraft: { title: "Minecraft", component: MinecraftWidget },
   services: { title: "Services", component: ServicesWidget },
   plex: { title: "Plex", component: PlexWidget },
+  apps: { title: "Media apps", component: MediaAppsWidget },
 };

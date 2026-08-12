@@ -63,6 +63,24 @@ plex:
   # Plex page (service control still works via services).
   token: ""
 
+# Media stack integrations — read-only status: download queues with
+# progress, health warnings, missing/upcoming counts, pending requests.
+# API keys are found in each app under Settings -> General -> Security.
+apps: []
+#  - type: radarr           # radarr | sonarr | lidarr | readarr | whisparr
+#    url: http://127.0.0.1:7878        # | prowlarr | overseerr | jellyseerr
+#    api_key: "…"
+#  - type: sonarr
+#    url: http://127.0.0.1:8989
+#    api_key: "…"
+#  - type: prowlarr
+#    url: http://127.0.0.1:9696
+#    api_key: "…"
+#  - name: Jellyseerr       # optional display name
+#    type: jellyseerr
+#    url: http://127.0.0.1:5055
+#    api_key: "…"
+
 minecraft:
   # Every subdirectory containing a server jar / run.sh becomes a managed
   # server; the directory name is its id.

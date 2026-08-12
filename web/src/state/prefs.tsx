@@ -44,6 +44,7 @@ export const DEFAULT_WIDGETS: WidgetPref[] = [
   { id: "minecraft", visible: true, size: 2 },
   { id: "services", visible: true, size: 1 },
   { id: "plex", visible: true, size: 1 },
+  { id: "apps", visible: true, size: 1 },
 ];
 
 const DEFAULTS: Prefs = {

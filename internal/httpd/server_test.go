@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ziggybadans/control-panel/internal/apps"
 	"github.com/ziggybadans/control-panel/internal/audit"
 	"github.com/ziggybadans/control-panel/internal/auth"
 	"github.com/ziggybadans/control-panel/internal/config"
@@ -41,6 +42,7 @@ func testServer(t *testing.T, authMode string) *Server {
 		Storage:  storage.NewMockProvider(),
 		Services: services.NewMockProvider(),
 		Plex:     plex.NewMockProvider(),
+		Apps:     apps.NewMockProvider(),
 		MC:       mc.NewMockService(bus, runner),
 	})
 }

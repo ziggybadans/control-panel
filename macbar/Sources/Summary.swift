@@ -28,6 +28,11 @@ struct Summary: Codable, Equatable {
     var mc: [MCServer]
     var plexConfigured: Bool
     var plexStreams: Int
+    // Media apps rollup (absent on older panel versions).
+    var appsConfigured: Bool?
+    var appsQueue: Int?
+    var appsIssues: Int?
+    var requestsPending: Int?
     var jobRunning: String?
 }
 
