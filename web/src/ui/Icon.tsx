@@ -94,6 +94,15 @@ const paths: Record<string, JSX.Element> = {
       <path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4" />
     </>
   ),
+  folder: (
+    <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4l2 2.5h9A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5v-12z" />
+  ),
+  file: (
+    <>
+      <path d="M6 3.5A1.5 1.5 0 0 1 7.5 2H14l4.5 4.5v14a1.5 1.5 0 0 1-1.5 1.5H7.5A1.5 1.5 0 0 1 6 20.5v-17z" />
+      <path d="M14 2v5h5" />
+    </>
+  ),
   fan: (
     <>
       <circle cx="12" cy="12" r="2.2" />

@@ -371,6 +371,25 @@ export interface MCCreateSpec {
   acceptEula: boolean;
 }
 
+// File manager
+
+export interface FilesRoot {
+  name: string;
+  path: string;
+  readOnly: boolean;
+}
+
+export interface FilesRootsResponse {
+  configured: boolean;
+  roots: FilesRoot[] | null;
+}
+
+export interface FilesListResponse {
+  root: string;
+  path: string;
+  entries: FileEntry[] | null;
+}
+
 // Jobs / audit
 
 export interface Job {
