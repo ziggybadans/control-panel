@@ -27,6 +27,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/config"
 	"github.com/ziggybadans/control-panel/internal/events"
 	"github.com/ziggybadans/control-panel/internal/fans"
+	"github.com/ziggybadans/control-panel/internal/files"
 	"github.com/ziggybadans/control-panel/internal/httpd"
 	"github.com/ziggybadans/control-panel/internal/jobs"
 	"github.com/ziggybadans/control-panel/internal/mc"
@@ -177,6 +178,18 @@ func main() {
 		time.Duration(cfg.Fans.IntervalMS)*time.Millisecond, cfg.FanControl())
 	go fansCtl.Run(ctx)
 
+	// File manager roots: in mock mode with no explicit config, browse a
+	// seeded sandbox tree instead of the real filesystem.
+	filesRoots := cfg.Files.Roots
+	if mock && len(filesRoots) == 0 {
+		if seeded, err := files.SeedMock(cfg.DataDir); err == nil {
+			filesRoots = seeded
+		} else {
+			slog.Warn("mock file tree seeding failed", "err", err)
+		}
+	}
+	filesSvc := files.New(filesRoots)
+
 	// Service state watcher: cheap poll, published to all SSE clients.
 	go func() {
 		t := time.NewTicker(5 * time.Second)
@@ -214,6 +227,7 @@ func main() {
 		MC:       mcService,
 		Update:   updateProv,
 		Fans:     fansCtl,
+		Files:    filesSvc,
 		Power:    powerFn,
 	})
 

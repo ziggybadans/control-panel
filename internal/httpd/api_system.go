@@ -5,10 +5,19 @@ import (
 	"os"
 	"runtime"
 	"time"
+
+	"github.com/ziggybadans/control-panel/internal/files"
 )
 
 // startedAt approximates process start (the server is built during startup).
 var startedAt = time.Now()
+
+func fileRootCount(s *files.Service) int {
+	if s == nil {
+		return 0
+	}
+	return len(s.Roots())
+}
 
 // panelInfo describes the panel process and its configuration for the About
 // card. Secrets (tokens, API keys, password hash) never appear here.
@@ -35,6 +44,7 @@ type featureInfo struct {
 	Power          bool   `json:"power"`
 	UpdateRepo     string `json:"updateRepo,omitempty"`
 	FanControl     bool   `json:"fanControl"`
+	FileRoots      int    `json:"fileRoots"`
 }
 
 func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +71,7 @@ func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
 				Power:          s.Cfg.Power.Allow,
 				UpdateRepo:     s.Cfg.Update.Repo,
 				FanControl:     s.Cfg.FanControl(),
+				FileRoots:      fileRootCount(s.Files),
 			},
 		},
 	})

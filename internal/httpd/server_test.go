@@ -13,6 +13,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/config"
 	"github.com/ziggybadans/control-panel/internal/events"
 	"github.com/ziggybadans/control-panel/internal/fans"
+	"github.com/ziggybadans/control-panel/internal/files"
 	"github.com/ziggybadans/control-panel/internal/jobs"
 	"github.com/ziggybadans/control-panel/internal/mc"
 	"github.com/ziggybadans/control-panel/internal/metrics"
@@ -46,6 +47,10 @@ func testServer(t *testing.T, authMode string) *Server {
 		Apps:     apps.NewMockProvider(),
 		MC:       mc.NewMockService(bus, runner, dir),
 		Fans:     fans.NewController(fans.NewMockProvider(), bus, dir, time.Second, true),
+		Files: files.New([]config.FilesRoot{
+			{Name: "data", Path: dir},
+			{Name: "ro", Path: dir, ReadOnly: true},
+		}),
 	})
 }
 
@@ -134,6 +139,58 @@ func TestClientIPTrustedProxies(t *testing.T) {
 	req.Header.Set("X-Forwarded-For", "10.9.9.9, 198.51.100.9")
 	if got := s.clientIP(req); got != "198.51.100.9" {
 		t.Errorf("rightmost non-trusted hop: got %q, want 198.51.100.9", got)
+	}
+}
+
+func doBody(h http.Handler, method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestFilesSafety(t *testing.T) {
+	h := testServer(t, "none").Handler()
+	hdr := map[string]string{"X-CP": "1"}
+
+	// Delete without the confirm header: 428.
+	rec := doBody(h, "POST", "/api/files/op",
+		`{"root":"data","action":"delete","path":"x.txt"}`, hdr)
+	if rec.Code != http.StatusPreconditionRequired {
+		t.Errorf("delete without confirm: got %d, want 428", rec.Code)
+	}
+
+	// Any write on a read-only root: 403, even with confirm.
+	rec = doBody(h, "POST", "/api/files/op",
+		`{"root":"ro","action":"delete","path":"x.txt"}`,
+		map[string]string{"X-CP": "1", "X-Confirm": "x.txt"})
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("delete on read-only root: got %d, want 403", rec.Code)
+	}
+	rec = doBody(h, "POST", "/api/files/op",
+		`{"root":"ro","action":"mkdir","path":"new"}`, hdr)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("mkdir on read-only root: got %d, want 403", rec.Code)
+	}
+	rec = doBody(h, "POST", "/api/files/upload?root=ro", "", hdr)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("upload to read-only root: got %d, want 403", rec.Code)
+	}
+
+	// Path traversal is refused.
+	rec = doBody(h, "GET", "/api/files/list?root=data&path=..%2F..%2Fetc", "", hdr)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("traversal list: got %d, want 422", rec.Code)
+	}
+
+	// Unknown root.
+	rec = doBody(h, "GET", "/api/files/list?root=nope", "", hdr)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("unknown root: got %d, want 404", rec.Code)
 	}
 }
 

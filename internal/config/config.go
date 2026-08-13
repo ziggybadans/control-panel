@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -35,6 +36,24 @@ type Config struct {
 	Power     Power     `yaml:"power"`
 	Update    Update    `yaml:"update"`
 	Fans      Fans      `yaml:"fans"`
+	Files     Files     `yaml:"files"`
+}
+
+// Files configures the general file manager.
+type Files struct {
+	// Roots lists the directory trees the panel may browse and manage.
+	// Empty disables the Files page. Every operation is confined to its
+	// root (no "..", symlinks may not escape).
+	Roots []FilesRoot `yaml:"roots"`
+}
+
+type FilesRoot struct {
+	// Name identifies the root in the UI and API (e.g. "pool").
+	Name string `yaml:"name"`
+	// Path is the absolute directory the root exposes.
+	Path string `yaml:"path"`
+	// ReadOnly hides all mutating operations (upload, rename, delete…).
+	ReadOnly bool `yaml:"read_only"`
 }
 
 type Fans struct {
@@ -254,6 +273,22 @@ func (c *Config) validate() error {
 	}
 	if c.Fans.IntervalMS < 500 {
 		c.Fans.IntervalMS = 500
+	}
+	seenRoots := map[string]bool{}
+	for i, root := range c.Files.Roots {
+		if root.Name == "" {
+			return fmt.Errorf("files.roots[%d]: name is required", i)
+		}
+		if strings.ContainsAny(root.Name, "/\\") || root.Name == "." || root.Name == ".." {
+			return fmt.Errorf("files.roots[%d]: invalid name %q", i, root.Name)
+		}
+		if seenRoots[root.Name] {
+			return fmt.Errorf("files.roots: duplicate name %q", root.Name)
+		}
+		seenRoots[root.Name] = true
+		if !filepath.IsAbs(root.Path) {
+			return fmt.Errorf("files.roots[%d] (%s): path must be absolute, got %q", i, root.Name, root.Path)
+		}
 	}
 	if r := c.Update.Repo; r != "" {
 		parts := strings.Split(r, "/")

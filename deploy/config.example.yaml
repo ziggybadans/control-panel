@@ -122,6 +122,18 @@ minecraft:
   #    jar: neoforge-launcher.jar   # override jar auto-detection
   #    jvm_args: ["-Dfml.readTimeout=180"]
 
+# General file manager (Files page): browse, upload, download (folders
+# stream as zip), rename, delete. Every operation is confined to its root —
+# no "..", and symlinks may not lead outside. Deletes require typed
+# confirmation. Empty list disables the page.
+files:
+  roots: []
+  #  - name: pool
+  #    path: /media/pool
+  #  - name: minecraft
+  #    path: /srv/minecraft
+  #    read_only: true    # hide upload/rename/delete for this root
+
 fans:
   # Fan curves / manual duty write hwmon PWM values; set false to make the
   # Fans page monitoring-only. Fans stay under firmware control until a
