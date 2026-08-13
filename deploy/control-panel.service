@@ -24,6 +24,9 @@ KillMode=control-group
 # game server dirs, and the data dir).
 NoNewPrivileges=false
 ProtectSystem=full
+# The in-panel updater swaps its own binary; everything else under /usr
+# stays read-only.
+ReadWritePaths=/usr/local/bin
 PrivateTmp=true
 ProtectHome=read-only
 ProtectClock=true
