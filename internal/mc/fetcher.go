@@ -2,13 +2,20 @@ package mc
 
 import (
 	"context"
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -112,10 +119,25 @@ func (f *fetcher) Versions(ctx context.Context, flavor string) ([]string, error)
 	return list, nil
 }
 
+// versionArgRe confines client-supplied version strings: they are spliced
+// into download URLs and local file names.
+var versionArgRe = regexp.MustCompile(`^[A-Za-z0-9._+-]{1,64}$`)
+
+// checksum is an expected digest for a download ("" algo = none published).
+type checksum struct {
+	algo string // "sha256" | "sha1" | "md5"
+	hex  string
+}
+
 // FetchJar downloads the server jar for flavor/version into destDir and
-// returns its file name.
+// returns its file name. Downloads are verified against the checksum the
+// project API publishes (Fabric publishes none).
 func (f *fetcher) FetchJar(ctx context.Context, flavor, version, destDir string, out func(string)) (string, error) {
+	if !versionArgRe.MatchString(version) {
+		return "", fmt.Errorf("invalid version %q", version)
+	}
 	var dlURL, name string
+	var sum checksum
 	switch flavor {
 	case "paper":
 		var builds struct {
@@ -123,7 +145,8 @@ func (f *fetcher) FetchJar(ctx context.Context, flavor, version, destDir string,
 				Build     int `json:"build"`
 				Downloads struct {
 					Application struct {
-						Name string `json:"name"`
+						Name   string `json:"name"`
+						SHA256 string `json:"sha256"`
 					} `json:"application"`
 				} `json:"downloads"`
 			} `json:"builds"`
@@ -136,11 +159,29 @@ func (f *fetcher) FetchJar(ctx context.Context, flavor, version, destDir string,
 			return "", fmt.Errorf("no paper builds for %s", version)
 		}
 		last := builds.Builds[len(builds.Builds)-1]
-		name = last.Downloads.Application.Name
+		// Never trust an API-supplied string as a path component.
+		name = filepath.Base(last.Downloads.Application.Name)
+		if name == "." || name == string(filepath.Separator) || name == "" {
+			return "", fmt.Errorf("paper API returned an unusable file name %q", last.Downloads.Application.Name)
+		}
 		dlURL = fmt.Sprintf("%s/builds/%d/downloads/%s", base, last.Build, url.PathEscape(name))
+		sum = checksum{"sha256", last.Downloads.Application.SHA256}
 	case "purpur":
+		var build struct {
+			Build string `json:"build"`
+			MD5   string `json:"md5"`
+		}
+		base := "https://api.purpurmc.org/v2/purpur/" + url.PathEscape(version)
+		if err := f.getJSON(ctx, base+"/latest", &build); err != nil {
+			return "", fmt.Errorf("purpur build for %s: %w", version, err)
+		}
+		if build.Build == "" {
+			return "", fmt.Errorf("no purpur builds for %s", version)
+		}
 		name = fmt.Sprintf("purpur-%s.jar", version)
-		dlURL = fmt.Sprintf("https://api.purpurmc.org/v2/purpur/%s/latest/download", url.PathEscape(version))
+		// Pin the exact build so the verified hash matches what we download.
+		dlURL = base + "/" + url.PathEscape(build.Build) + "/download"
+		sum = checksum{"md5", build.MD5}
 	case "vanilla":
 		var manifest struct {
 			Versions []struct {
@@ -164,7 +205,8 @@ func (f *fetcher) FetchJar(ctx context.Context, flavor, version, destDir string,
 		var meta struct {
 			Downloads struct {
 				Server struct {
-					URL string `json:"url"`
+					URL  string `json:"url"`
+					SHA1 string `json:"sha1"`
 				} `json:"server"`
 			} `json:"downloads"`
 		}
@@ -176,6 +218,7 @@ func (f *fetcher) FetchJar(ctx context.Context, flavor, version, destDir string,
 		}
 		name = fmt.Sprintf("minecraft_server-%s.jar", version)
 		dlURL = meta.Downloads.Server.URL
+		sum = checksum{"sha1", meta.Downloads.Server.SHA1}
 	case "fabric":
 		loaderV, installerV, err := f.fabricComponents(ctx, version)
 		if err != nil {
@@ -189,7 +232,7 @@ func (f *fetcher) FetchJar(ctx context.Context, flavor, version, destDir string,
 	}
 
 	out(fmt.Sprintf("downloading %s from %s", name, hostOf(dlURL)))
-	if err := f.download(ctx, dlURL, filepath.Join(destDir, name), out); err != nil {
+	if err := f.download(ctx, dlURL, filepath.Join(destDir, name), sum, out); err != nil {
 		return "", err
 	}
 	return name, nil
@@ -233,8 +276,9 @@ func (f *fetcher) fabricComponents(ctx context.Context, game string) (loader, in
 	return loader, installer, nil
 }
 
-// download streams a URL to path with coarse progress reporting.
-func (f *fetcher) download(ctx context.Context, rawURL, path string, out func(string)) error {
+// download streams a URL to path with coarse progress reporting, verifying
+// sum (when one is published) before the file becomes visible at path.
+func (f *fetcher) download(ctx context.Context, rawURL, path string, sum checksum, out func(string)) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
 	if err != nil {
 		return err
@@ -257,6 +301,21 @@ func (f *fetcher) download(ctx context.Context, rawURL, path string, out func(st
 		os.Remove(tmp)
 	}()
 
+	var hasher hash.Hash
+	switch sum.algo {
+	case "sha256":
+		hasher = sha256.New()
+	case "sha1":
+		hasher = sha1.New()
+	case "md5":
+		hasher = md5.New()
+	}
+	if hasher != nil && sum.hex == "" {
+		// The API contract includes a digest; treat its absence as an error
+		// rather than silently skipping verification.
+		return fmt.Errorf("no %s checksum published for this download", sum.algo)
+	}
+
 	total := resp.ContentLength
 	var done int64
 	lastPct := -10
@@ -266,6 +325,9 @@ func (f *fetcher) download(ctx context.Context, rawURL, path string, out func(st
 		if n > 0 {
 			if _, werr := w.Write(buf[:n]); werr != nil {
 				return werr
+			}
+			if hasher != nil {
+				hasher.Write(buf[:n])
 			}
 			done += int64(n)
 			if total > 0 {
@@ -283,6 +345,13 @@ func (f *fetcher) download(ctx context.Context, rawURL, path string, out func(st
 		if rerr != nil {
 			return rerr
 		}
+	}
+	if hasher != nil {
+		got := hex.EncodeToString(hasher.Sum(nil))
+		if !strings.EqualFold(got, sum.hex) {
+			return fmt.Errorf("checksum mismatch: %s of download is %s, expected %s", sum.algo, got, sum.hex)
+		}
+		out(sum.algo + " checksum verified")
 	}
 	if err := w.Close(); err != nil {
 		return err
@@ -305,4 +374,3 @@ func reversed(s []string) []string {
 	}
 	return out
 }
-

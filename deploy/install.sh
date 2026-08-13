@@ -41,11 +41,17 @@ Installed. Next steps:
      then paste the printed hash into /etc/control-panel/config.yaml
      (auth.password_hash).
 
-  2. Review the rest of the config (minecraft.root, services.units,
-     plex.token, storage.snapraid.config).
+  2. Create an unprivileged user for the game servers and set
+     minecraft.run_as (strongly recommended — mods/plugins are third-party
+     code and should not run as root):
+         useradd --system --home /srv/minecraft --shell /usr/sbin/nologin minecraft
+     then in config.yaml:  minecraft.run_as: minecraft
 
-  3. Start it:
+  3. Review the rest of the config (minecraft.root, services.units,
+     plex.token, storage.snapraid.config, tls or a VPN-bound listen).
+
+  4. Start it:
          systemctl enable --now control-panel
 
-  4. Open http://<server>:9090 from your Mac/PC.
+  5. Open http://<server>:9090 from your Mac/PC.
 EOF

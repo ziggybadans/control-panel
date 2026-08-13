@@ -58,3 +58,43 @@ func TestLoadRejectsHalfTLS(t *testing.T) {
 		t.Error("cert without key should be rejected")
 	}
 }
+
+func loadYAML(t *testing.T, yaml string) (Config, error) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return Load(path)
+}
+
+func TestRemoteNoneRequiresOptIn(t *testing.T) {
+	// mode none on a non-loopback listen: refused without the explicit flag.
+	if _, err := loadYAML(t, "listen: \"0.0.0.0:9090\"\nauth:\n  mode: none\n"); err == nil {
+		t.Error("auth.mode none on 0.0.0.0 should be rejected without allow_remote_none")
+	}
+	// Loopback listen: fine.
+	if _, err := loadYAML(t, "listen: \"127.0.0.1:9090\"\nauth:\n  mode: none\n"); err != nil {
+		t.Errorf("auth.mode none on loopback rejected: %v", err)
+	}
+	if _, err := loadYAML(t, "listen: \"localhost:9090\"\nauth:\n  mode: none\n"); err != nil {
+		t.Errorf("auth.mode none on localhost rejected: %v", err)
+	}
+	// Explicit opt-in: allowed.
+	if _, err := loadYAML(t, "listen: \"0.0.0.0:9090\"\nauth:\n  mode: none\n  allow_remote_none: true\n"); err != nil {
+		t.Errorf("explicit allow_remote_none rejected: %v", err)
+	}
+}
+
+func TestTrustedProxiesValidated(t *testing.T) {
+	if _, err := loadYAML(t, "trusted_proxies: [\"not-an-ip\"]\n"); err == nil {
+		t.Error("invalid trusted_proxies entry should be rejected")
+	}
+	cfg, err := loadYAML(t, "trusted_proxies: [\"127.0.0.1\", \"10.0.0.0/8\"]\n")
+	if err != nil {
+		t.Fatalf("valid trusted_proxies rejected: %v", err)
+	}
+	if got := len(cfg.TrustedProxyNets()); got != 2 {
+		t.Errorf("TrustedProxyNets: got %d nets, want 2", got)
+	}
+}

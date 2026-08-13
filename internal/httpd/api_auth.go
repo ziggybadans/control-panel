@@ -14,7 +14,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		return
 	}
-	ip := clientIP(r)
+	ip := s.clientIP(r)
 	if !s.Limiter.Allow(ip) {
 		_ = s.record(r, "auth.login", ip, "rate limited", errRateLimited)
 		writeErr(w, http.StatusTooManyRequests, "too many failed attempts — try again in a few minutes")
@@ -26,7 +26,16 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &body, 4096) {
 		return
 	}
-	if s.Cfg.Auth.PasswordHash == "" || !auth.VerifyPassword(s.Cfg.Auth.PasswordHash, body.Password) {
+	// Bound concurrent argon2id runs (memory-hard by design); excess
+	// attempts wait their turn instead of multiplying the allocation.
+	select {
+	case s.loginSem <- struct{}{}:
+	case <-r.Context().Done():
+		return
+	}
+	valid := s.Cfg.Auth.PasswordHash != "" && auth.VerifyPassword(s.Cfg.Auth.PasswordHash, body.Password)
+	<-s.loginSem
+	if !valid {
 		s.Limiter.Fail(ip)
 		_ = s.record(r, "auth.login", ip, "", errBadPassword)
 		writeErr(w, http.StatusUnauthorized, "incorrect password")

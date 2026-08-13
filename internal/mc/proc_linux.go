@@ -3,8 +3,10 @@
 package mc
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -39,4 +41,38 @@ func procStats(pid int) (cpuTicks uint64, rssBytes uint64, ok bool) {
 // to the panel don't propagate to game servers.
 func setProcAttrs(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+}
+
+// applyRunAs drops the child to uid/gid (supplementary groups cleared).
+// Requires the panel itself to run as root.
+func applyRunAs(cmd *exec.Cmd, uid, gid int) error {
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("dropping privileges requires the panel to run as root")
+	}
+	cmd.SysProcAttr.Credential = &syscall.Credential{
+		Uid:    uint32(uid),
+		Gid:    uint32(gid),
+		Groups: []uint32{},
+	}
+	return nil
+}
+
+// chownTree hands the server directory to uid/gid so a de-privileged server
+// process can write its own files (panel-side writes happen as root and are
+// re-owned here on every start).
+func chownTree(root string, uid, gid int) error {
+	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil // vanished mid-walk
+		}
+		if st, ok := info.Sys().(*syscall.Stat_t); ok &&
+			int(st.Uid) == uid && int(st.Gid) == gid {
+			return nil
+		}
+		return os.Lchown(path, uid, gid)
+	})
 }

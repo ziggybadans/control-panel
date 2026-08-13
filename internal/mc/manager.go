@@ -119,6 +119,9 @@ func (m *Manager) resolveCfgLocked(id, dir string) resolvedCfg {
 		Aikar:       fileCfg.Aikar,
 		AutoStart:   fileCfg.AutoStart,
 		AutoRestart: fileCfg.AutoRestart,
+		RunAsUser:   m.cfg.RunAs,
+		RunAsUID:    m.cfg.RunAsUID,
+		RunAsGID:    m.cfg.RunAsGID,
 	}
 	// Jar resolution: explicit config > server.jar > single *.jar > run.sh.
 	if fileCfg.Jar != "" {

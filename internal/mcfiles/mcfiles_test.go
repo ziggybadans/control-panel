@@ -154,6 +154,25 @@ func TestUnzipRejectsTraversal(t *testing.T) {
 	}
 }
 
+func TestUnzipEnforcesExtractionBudget(t *testing.T) {
+	old := maxUnzipBytes
+	maxUnzipBytes = 1024
+	defer func() { maxUnzipBytes = old }()
+
+	root := newRoot(t)
+	big := filepath.Join(root, "big.zip")
+	f, _ := os.Create(big)
+	zw := zip.NewWriter(f)
+	w, _ := zw.Create("payload.bin")
+	w.Write(make([]byte, 4096)) // 4 KiB against a 1 KiB budget
+	zw.Close()
+	f.Close()
+
+	if err := Unzip(context.Background(), root, "big.zip", func(string) {}); err == nil {
+		t.Fatal("archive exceeding the extraction budget accepted")
+	}
+}
+
 func TestAddonsToggle(t *testing.T) {
 	root := newRoot(t)
 	addons, err := ListAddons(root)

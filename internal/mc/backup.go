@@ -123,6 +123,11 @@ func tarGzDir(ctx context.Context, srcDir, destFile string, out func(string)) er
 	return nil
 }
 
+// maxRestoreBytes bounds total extraction as a decompression-bomb guard.
+// Generous on purpose: legitimate modded worlds run large, and a hostile
+// archive is stopped long before it can exhaust the pool.
+const maxRestoreBytes = 512 << 30 // 512 GiB
+
 // extractTarGz extracts archive into destDir, refusing entries that would
 // escape it.
 func extractTarGz(archive, destDir string) error {
@@ -139,6 +144,7 @@ func extractTarGz(archive, destDir string) error {
 	tr := tar.NewReader(gz)
 
 	cleanDest := filepath.Clean(destDir)
+	var total int64
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -158,8 +164,12 @@ func extractTarGz(archive, destDir string) error {
 			}
 		case tar.TypeSymlink:
 			// Only allow relative links that stay inside the destination.
-			linkTarget := filepath.Join(filepath.Dir(target), hdr.Linkname)
-			if filepath.IsAbs(hdr.Linkname) || !strings.HasPrefix(filepath.Clean(linkTarget), cleanDest) {
+			// The separator matters: without it a link to a sibling of the
+			// destination that shares its name as a prefix would slip through.
+			linkTarget := filepath.Clean(filepath.Join(filepath.Dir(target), hdr.Linkname))
+			inside := linkTarget == cleanDest ||
+				strings.HasPrefix(linkTarget, cleanDest+string(filepath.Separator))
+			if filepath.IsAbs(hdr.Linkname) || !inside {
 				continue
 			}
 			_ = os.Symlink(hdr.Linkname, target)
@@ -171,11 +181,15 @@ func extractTarGz(archive, destDir string) error {
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(dst, tr); err != nil {
-				dst.Close()
+			n, err := io.Copy(dst, tr)
+			dst.Close()
+			if err != nil {
 				return err
 			}
-			dst.Close()
+			total += n
+			if total > maxRestoreBytes {
+				return fmt.Errorf("archive too large (over %d GiB extracted)", maxRestoreBytes>>30)
+			}
 		}
 	}
 }

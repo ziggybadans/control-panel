@@ -11,7 +11,8 @@ import (
 )
 
 // maxUnzipBytes caps total extracted size as a zip-bomb guard.
-const maxUnzipBytes = 20 << 30 // 20 GiB
+// A var so tests can lower it without writing gigabytes.
+var maxUnzipBytes int64 = 20 << 30 // 20 GiB
 
 // Zip archives a file or directory at rel into "<rel>.zip" next to it.
 func Zip(ctx context.Context, root, rel string, out func(string)) error {
@@ -157,8 +158,9 @@ func Unzip(ctx context.Context, root, rel string, out func(string)) error {
 			}
 			continue
 		}
-		total += int64(zf.UncompressedSize64)
-		if total > maxUnzipBytes {
+		// Reject early on declared sizes, then meter what is actually
+		// written: a lying header must not grant a fresh budget per entry.
+		if int64(zf.UncompressedSize64) > maxUnzipBytes-total {
 			return fmt.Errorf("archive too large (over %d GiB extracted)", maxUnzipBytes>>30)
 		}
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
@@ -173,12 +175,16 @@ func Unzip(ctx context.Context, root, rel string, out func(string)) error {
 			rc.Close()
 			return err
 		}
-		// LimitReader guards against lying size headers.
-		_, err = io.Copy(w, io.LimitReader(rc, maxUnzipBytes))
+		remaining := maxUnzipBytes - total
+		n, err := io.Copy(w, io.LimitReader(rc, remaining+1))
 		rc.Close()
 		w.Close()
 		if err != nil {
 			return err
+		}
+		total += n
+		if n > remaining {
+			return fmt.Errorf("archive too large (over %d GiB extracted)", maxUnzipBytes>>30)
 		}
 		if (i+1)%250 == 0 {
 			out(fmt.Sprintf("%d entries extracted…", i+1))

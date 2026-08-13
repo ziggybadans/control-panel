@@ -52,6 +52,43 @@ func TestExtractRejectsTraversal(t *testing.T) {
 	}
 }
 
+func TestExtractSkipsSymlinkToPrefixSibling(t *testing.T) {
+	// A symlink whose target is a SIBLING of the destination that shares its
+	// name as a string prefix ("dest-evil" vs "dest") must not be created:
+	// the containment check needs the path separator, not a bare prefix.
+	dir := t.TempDir()
+	archive := filepath.Join(dir, "evil-link.tar.gz")
+	writeSymlinkArchive(t, archive, "link", "../dest-evil/x")
+
+	dest := filepath.Join(dir, "dest")
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := extractTarGz(archive, dest); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(dest, "link")); err == nil {
+		t.Fatal("symlink pointing outside the destination was created")
+	}
+}
+
+func TestExtractAllowsInternalSymlink(t *testing.T) {
+	dir := t.TempDir()
+	archive := filepath.Join(dir, "ok-link.tar.gz")
+	writeSymlinkArchive(t, archive, "link", "world")
+
+	dest := filepath.Join(dir, "dest")
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := extractTarGz(archive, dest); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(dest, "link")); err != nil {
+		t.Fatal("relative symlink inside the destination should be preserved")
+	}
+}
+
 func mustWrite(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

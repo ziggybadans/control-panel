@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -16,6 +17,12 @@ import (
 type Config struct {
 	Listen  string `yaml:"listen"`
 	DataDir string `yaml:"data_dir"`
+
+	// TrustedProxies lists reverse-proxy addresses (IPs or CIDRs). Requests
+	// arriving from one use the rightmost non-trusted X-Forwarded-For hop as
+	// the client address (login rate limiting, audit log). Empty = the panel
+	// is reached directly and X-Forwarded-For is ignored.
+	TrustedProxies []string `yaml:"trusted_proxies"`
 
 	Auth      Auth      `yaml:"auth"`
 	TLS       TLS       `yaml:"tls"`
@@ -47,6 +54,11 @@ type Auth struct {
 	Mode         string `yaml:"mode"`
 	PasswordHash string `yaml:"password_hash"`
 	SessionHours int    `yaml:"session_hours"`
+	// AllowRemoteNone permits mode "none" on a non-loopback listen address.
+	// Without it the panel refuses to start in that combination: an
+	// unauthenticated panel reachable from the network is one DNS-rebinding
+	// page-load away from being driven by any website a LAN device visits.
+	AllowRemoteNone bool `yaml:"allow_remote_none"`
 }
 
 type TLS struct {
@@ -99,6 +111,13 @@ type Minecraft struct {
 	Java string `yaml:"java"`
 	// BackupDir stores server backups (default: <root>/.backups).
 	BackupDir string `yaml:"backup_dir"`
+	// RunAs launches server processes as this system user instead of the
+	// panel's own (root) account. Strongly recommended: mods and plugins are
+	// third-party code. Server directories are chowned to this user on start.
+	RunAs string `yaml:"run_as"`
+	// RunAsUID/RunAsGID are resolved from RunAs at startup (not config keys).
+	RunAsUID int `yaml:"-"`
+	RunAsGID int `yaml:"-"`
 	// Resume restarts servers that were running when the panel stopped.
 	Resume  *bool               `yaml:"resume"`
 	Servers map[string]MCServer `yaml:"servers"`
@@ -185,8 +204,19 @@ func (c *Config) validate() error {
 	case "", "password":
 		c.Auth.Mode = "password"
 	case "none":
+		if !c.ListenIsLoopback() && !c.Auth.AllowRemoteNone {
+			return fmt.Errorf("auth.mode \"none\" with a non-loopback listen (%q) exposes the panel "+
+				"to the whole network without a password.\n"+
+				"Either bind to loopback (listen: \"127.0.0.1:9090\"), use auth.mode: password,\n"+
+				"or set auth.allow_remote_none: true if you accept the risk", c.Listen)
+		}
 	default:
 		return fmt.Errorf("auth.mode must be \"password\" or \"none\", got %q", c.Auth.Mode)
+	}
+	for _, p := range c.TrustedProxies {
+		if _, err := parseIPOrCIDR(p); err != nil {
+			return fmt.Errorf("trusted_proxies: %w", err)
+		}
 	}
 	if c.Auth.SessionHours <= 0 {
 		c.Auth.SessionHours = 24 * 7
@@ -239,6 +269,46 @@ var ValidAppTypes = map[string]bool{
 // SessionTTL returns the configured session lifetime.
 func (c *Config) SessionTTL() time.Duration {
 	return time.Duration(c.Auth.SessionHours) * time.Hour
+}
+
+// ListenIsLoopback reports whether the listen address binds only loopback.
+func (c *Config) ListenIsLoopback() bool {
+	host, _, err := net.SplitHostPort(c.Listen)
+	if err != nil {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// TrustedProxyNets returns the parsed trusted_proxies networks. Entries are
+// syntax-checked at load time; anything unparsable here is skipped.
+func (c *Config) TrustedProxyNets() []*net.IPNet {
+	var nets []*net.IPNet
+	for _, p := range c.TrustedProxies {
+		if n, err := parseIPOrCIDR(p); err == nil {
+			nets = append(nets, n)
+		}
+	}
+	return nets
+}
+
+func parseIPOrCIDR(s string) (*net.IPNet, error) {
+	if _, n, err := net.ParseCIDR(s); err == nil {
+		return n, nil
+	}
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid IP or CIDR %q", s)
+	}
+	bits := 32
+	if ip.To4() == nil {
+		bits = 128
+	}
+	return &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)}, nil
 }
 
 // ResumeMC reports whether previously-running Minecraft servers should be

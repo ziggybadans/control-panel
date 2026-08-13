@@ -48,11 +48,21 @@ type Deps struct {
 
 type Server struct {
 	Deps
-	mux *http.ServeMux
+	mux            *http.ServeMux
+	trustedProxies []*net.IPNet
+	// loginSem bounds concurrent argon2id verifications: each one costs
+	// ~64 MiB, so an unauthenticated flood must queue instead of multiplying
+	// that allocation.
+	loginSem chan struct{}
 }
 
 func New(d Deps) *Server {
-	s := &Server{Deps: d, mux: http.NewServeMux()}
+	s := &Server{
+		Deps:           d,
+		mux:            http.NewServeMux(),
+		trustedProxies: d.Cfg.TrustedProxyNets(),
+		loginSem:       make(chan struct{}, 2),
+	}
 	s.routes()
 	return s
 }
@@ -250,10 +260,44 @@ func (s *Server) authed(r *http.Request) bool {
 	return err == nil && s.Sessions.Valid(c.Value)
 }
 
-func clientIP(r *http.Request) string {
+// clientIP returns the requester's address. When the connection comes from a
+// configured trusted proxy, the rightmost X-Forwarded-For hop that is not
+// itself a trusted proxy is used; XFF from anyone else is ignored (it is
+// trivially spoofable).
+func (s *Server) clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		host = r.RemoteAddr
+	}
+	if len(s.trustedProxies) == 0 || !s.isTrustedProxy(host) {
+		return host
+	}
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff == "" {
+		return host
+	}
+	hops := strings.Split(xff, ",")
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop := strings.TrimSpace(hops[i])
+		if hop == "" {
+			continue
+		}
+		if !s.isTrustedProxy(hop) {
+			return hop
+		}
 	}
 	return host
+}
+
+func (s *Server) isTrustedProxy(host string) bool {
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, n := range s.trustedProxies {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }

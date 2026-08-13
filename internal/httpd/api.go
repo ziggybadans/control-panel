@@ -49,7 +49,7 @@ func requireConfirm(w http.ResponseWriter, r *http.Request, target string) bool 
 // unchanged for inline error handling.
 func (s *Server) record(r *http.Request, action, target, detail string, err error) error {
 	e := audit.Entry{
-		IP:     clientIP(r),
+		IP:     s.clientIP(r),
 		Action: action,
 		Target: target,
 		Detail: detail,

@@ -24,6 +24,11 @@ type resolvedCfg struct {
 	Aikar       bool
 	AutoStart   bool
 	AutoRestart bool
+
+	// RunAsUser (with resolved uid/gid) de-privileges the server process.
+	RunAsUser string
+	RunAsUID  int
+	RunAsGID  int
 }
 
 // aikarFlags are the widely used GC tuning flags for Paper-family servers.
@@ -82,27 +87,27 @@ func (in *instance) Info() ServerInfo {
 	in.mu.Lock()
 	defer in.mu.Unlock()
 	info := ServerInfo{
-		ID:          in.id,
-		Name:        in.id,
-		Dir:         in.dir,
-		State:       in.state,
-		Version:     in.version,
-		Software:    in.software,
-		Port:        in.port,
-		MaxPlayers:  in.maxPlayers,
-		PID:         in.pid,
-		CPUPct:      in.cpuPct,
-		MemBytes:    in.memBytes,
-		MemMax:      parseMem(in.cfg.Mem),
-		Mem:         in.cfg.Mem,
-		Java:        in.cfg.Java,
-		Jar:         in.cfg.Jar,
-		JVMArgs:     in.cfg.JVMArgs,
-		Aikar:       in.cfg.Aikar,
-		AutoStart:   in.cfg.AutoStart,
-		AutoRestart: in.cfg.AutoRestart,
-		RconEnabled: in.rconEnabled,
-		LastExit:    in.lastExit,
+		ID:           in.id,
+		Name:         in.id,
+		Dir:          in.dir,
+		State:        in.state,
+		Version:      in.version,
+		Software:     in.software,
+		Port:         in.port,
+		MaxPlayers:   in.maxPlayers,
+		PID:          in.pid,
+		CPUPct:       in.cpuPct,
+		MemBytes:     in.memBytes,
+		MemMax:       parseMem(in.cfg.Mem),
+		Mem:          in.cfg.Mem,
+		Java:         in.cfg.Java,
+		Jar:          in.cfg.Jar,
+		JVMArgs:      in.cfg.JVMArgs,
+		Aikar:        in.cfg.Aikar,
+		AutoStart:    in.cfg.AutoStart,
+		AutoRestart:  in.cfg.AutoRestart,
+		RconEnabled:  in.rconEnabled,
+		LastExit:     in.lastExit,
 		EulaAccepted: in.eulaAcceptedLocked(),
 	}
 	if !in.startedAt.IsZero() && (in.state == StateRunning || in.state == StateStarting || in.state == StateStopping) {
@@ -172,6 +177,21 @@ func (in *instance) Start() error {
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = in.dir
 	setProcAttrs(cmd)
+	if in.cfg.RunAsUser != "" {
+		// Third-party server code (mods, plugins) must not run with the
+		// panel's privileges. Hand the directory over, then drop.
+		if err := chownTree(in.dir, in.cfg.RunAsUID, in.cfg.RunAsGID); err != nil {
+			in.mu.Unlock()
+			return fmt.Errorf("chown %s to %s: %w", in.dir, in.cfg.RunAsUser, err)
+		}
+		if err := applyRunAs(cmd, in.cfg.RunAsUID, in.cfg.RunAsGID); err != nil {
+			in.mu.Unlock()
+			return fmt.Errorf("run_as %s: %w", in.cfg.RunAsUser, err)
+		}
+		// Some mods resolve user.home; point it inside the server dir
+		// rather than at root's home.
+		cmd.Env = append(os.Environ(), "HOME="+in.dir, "USER="+in.cfg.RunAsUser)
+	}
 
 	stdinR, stdinW, err := os.Pipe()
 	if err != nil {

@@ -23,7 +23,11 @@ KillMode=control-group
 # Hardening (keep compatible with: systemctl calls, /proc, /sys, smartctl,
 # game server dirs, and the data dir).
 NoNewPrivileges=false
+ProtectSystem=full
+PrivateTmp=true
 ProtectHome=read-only
+ProtectClock=true
+ProtectHostname=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true

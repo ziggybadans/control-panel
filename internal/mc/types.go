@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/ziggybadans/control-panel/internal/jobs"
 )
@@ -125,6 +126,14 @@ func (s *CreateSpec) Validate() error {
 	}
 	if s.Mem != "" && parseMem(s.Mem) == 0 {
 		return fmt.Errorf("invalid memory value %q (use e.g. 4G)", s.Mem)
+	}
+	// The MOTD is written verbatim into server.properties: newlines would
+	// inject arbitrary property lines (and silently corrupt the file).
+	if strings.ContainsAny(s.MOTD, "\r\n") {
+		return fmt.Errorf("motd must be a single line")
+	}
+	if len(s.MOTD) > 256 {
+		return fmt.Errorf("motd too long (max 256 characters)")
 	}
 	return nil
 }

@@ -3,11 +3,20 @@
 # Every key is optional; the values shown are the defaults unless noted.
 
 # Address the panel listens on. Keep it LAN-only (or bind 127.0.0.1 and put
-# a reverse proxy/tailscale in front).
+# a reverse proxy/tailscale in front). Without TLS, prefer binding to a VPN
+# address (e.g. the machine's tailscale IP) so the password never crosses
+# the open network in cleartext.
 listen: "0.0.0.0:9090"
 
 # Runtime state: sessions, audit log, UI preferences, minecraft overrides.
 data_dir: /var/lib/control-panel
+
+# Reverse proxies (IPs or CIDRs) allowed to set X-Forwarded-For. Only needed
+# when the panel sits behind nginx/caddy/traefik: it makes login rate limits
+# and the audit log see real client addresses instead of the proxy's.
+trusted_proxies: []
+#  - 127.0.0.1
+#  - 10.0.0.0/8
 
 auth:
   # "password" (default) or "none". "none" disables login entirely — only
@@ -17,6 +26,9 @@ auth:
   password_hash: ""
   # How long a login stays valid.
   session_hours: 168
+  # mode "none" on a non-loopback listen is refused unless you explicitly
+  # accept the risk (any device — or website open on one — can drive the
+  # panel): allow_remote_none: true
 
 # Optional direct TLS. Alternatively terminate TLS at a reverse proxy.
 tls:
@@ -87,6 +99,12 @@ minecraft:
   root: /srv/minecraft
   # Default java executable (per-server override below).
   java: java
+  # STRONGLY RECOMMENDED: run game servers as this unprivileged system user
+  # instead of root. Mods and plugins are third-party code from the internet;
+  # this keeps a malicious one away from the rest of the machine. Create the
+  # user once with:  useradd --system --home /srv/minecraft --shell /usr/sbin/nologin minecraft
+  # Server directories are chowned to this user each time a server starts.
+  run_as: ""
   # Where backups are written (default <root>/.backups).
   backup_dir: ""
   # Restart servers that were running when the panel last shut down.

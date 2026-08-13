@@ -110,6 +110,30 @@ func TestAuthRequiredWhenPasswordMode(t *testing.T) {
 	}
 }
 
+func TestClientIPTrustedProxies(t *testing.T) {
+	s := testServer(t, "none")
+
+	req := httptest.NewRequest("GET", "/api/health", nil)
+	req.RemoteAddr = "203.0.113.7:1234"
+	req.Header.Set("X-Forwarded-For", "198.51.100.9")
+	// No trusted proxies configured: XFF is attacker-controlled, ignore it.
+	if got := s.clientIP(req); got != "203.0.113.7" {
+		t.Errorf("untrusted XFF honored: got %q", got)
+	}
+
+	s.Cfg.TrustedProxies = []string{"203.0.113.7"}
+	s.trustedProxies = s.Cfg.TrustedProxyNets()
+	// Trusted proxy in front: use the rightmost non-trusted hop.
+	if got := s.clientIP(req); got != "198.51.100.9" {
+		t.Errorf("XFF via trusted proxy: got %q, want 198.51.100.9", got)
+	}
+	// Spoofed extra hops from the client stay behind the real client hop.
+	req.Header.Set("X-Forwarded-For", "10.9.9.9, 198.51.100.9")
+	if got := s.clientIP(req); got != "198.51.100.9" {
+		t.Errorf("rightmost non-trusted hop: got %q, want 198.51.100.9", got)
+	}
+}
+
 func TestPowerDisabledByDefault(t *testing.T) {
 	h := testServer(t, "none").Handler()
 	rec := do(h, "POST", "/api/power/reboot", map[string]string{
