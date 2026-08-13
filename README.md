@@ -12,8 +12,11 @@ systemd service; accessed from any browser on the LAN.
 │ browser     │   REST + SSE     │  ├─ metrics    /proc, hwmon          │
 └─────────────┘                  │  ├─ storage    mergerfs, SMART,      │
                                  │  │             snapraid              │
+                                 │  ├─ fans       hwmon PWM curves      │
+                                 │  ├─ files      confined file roots   │
                                  │  ├─ services   systemd (allowlist)   │
                                  │  ├─ plex       Plex HTTP API         │
+                                 │  ├─ terminal   opt-in PTY (run_as)   │
                                  │  └─ minecraft  process supervision,  │
                                  │                console, RCON,        │
                                  │                backups               │
@@ -27,6 +30,19 @@ systemd service; accessed from any browser on the LAN.
 - **Storage** — mergerfs pool with per-branch usage, all physical disks with
   SMART health / temperature / power-on hours, snapraid status with
   sync/scrub jobs (streamed output).
+- **Fans** — hwmon fan monitoring plus optional control: per-fan manual duty
+  or an interactive temperature→duty curve editor (drag points, live
+  operating marker). Fans stay under firmware control until explicitly taken
+  over; unreadable sensors fail safe to 100%; the panel restores firmware
+  control on shutdown.
+- **Files** — a general file manager over config-defined roots (each
+  optionally read-only): browse, drag-drop upload, rename/move, unzip,
+  delete, raw file downloads, and folder downloads streamed as zip. All
+  paths are confined to their root, symlinks included.
+- **Terminal** — an opt-in web terminal (xterm.js over a server PTY) for the
+  cases a panel button can't cover. Off by default, runs as an unprivileged
+  `run_as` user, typed confirmation to open, session cap + idle timeout,
+  open/close audited.
 - **Services** — curated systemd units: state, uptime, memory, start / stop /
   restart, journal tail.
 - **Plex** — active sessions (with transcode indicator), library statistics,
@@ -60,13 +76,19 @@ The panel is designed so it cannot damage the server it manages:
 
 - **No arbitrary commands.** The agent executes a fixed allowlist of
   operations. Every external command is an argv array built from validated
-  enums and IDs — user input is never interpolated into a shell.
+  enums and IDs — user input is never interpolated into a shell. The one
+  deliberate exception is the opt-in Terminal page (a real shell): disabled
+  by default, de-privileged via `terminal.run_as`, typed-confirmed, capped,
+  idle-closed, and session-audited.
 - **Server-side confirmation.** Dangerous endpoints require an
   `X-Confirm: <target>` header echoing the exact target name; the UI enforces
   the same with typed-confirmation dialogs. Two tiers:
-  - *confirm* — service stop/restart, Minecraft stop/restart
+  - *confirm* — service stop/restart, Minecraft stop/restart, fan settings
   - *typed confirm* — force-kill, backup restore/delete, snapraid sync/scrub,
-    reboot/shutdown
+    folder delete, terminal session, reboot/shutdown
+- **Fail-safe fan control.** Fans are only driven when explicitly switched to
+  manual/curve; a curve whose sensor disappears drives its fan to 100%, and
+  release (or panel shutdown) restores the exact firmware state.
 - **Safe defaults.** Auth is mandatory unless explicitly disabled. Power
   actions are disabled until enabled in config. Backup restore refuses to run
   while the server is running and moves the replaced data aside instead of
