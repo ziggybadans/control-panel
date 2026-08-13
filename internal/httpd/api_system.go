@@ -2,13 +2,65 @@ package httpd
 
 import (
 	"net/http"
+	"os"
+	"runtime"
 	"time"
 )
+
+// startedAt approximates process start (the server is built during startup).
+var startedAt = time.Now()
+
+// panelInfo describes the panel process and its configuration for the About
+// card. Secrets (tokens, API keys, password hash) never appear here.
+type panelInfo struct {
+	GoVersion      string      `json:"goVersion"`
+	Pid            int         `json:"pid"`
+	StartedAt      int64       `json:"startedAt"` // unix ms
+	DataDir        string      `json:"dataDir"`
+	Listen         string      `json:"listen"`
+	TLS            bool        `json:"tls"`
+	AuthMode       string      `json:"authMode"`
+	SessionHours   int         `json:"sessionHours"`
+	TrustedProxies int         `json:"trustedProxies"`
+	Features       featureInfo `json:"features"`
+}
+
+type featureInfo struct {
+	Smart          bool   `json:"smart"`
+	Snapraid       bool   `json:"snapraid"`
+	Plex           bool   `json:"plex"`
+	Apps           int    `json:"apps"`
+	MinecraftRoot  string `json:"minecraftRoot"`
+	MinecraftRunAs string `json:"minecraftRunAs,omitempty"`
+	Power          bool   `json:"power"`
+	UpdateRepo     string `json:"updateRepo,omitempty"`
+}
 
 func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"info": s.SysInfo,
 		"now":  time.Now().UnixMilli(),
+		"panel": panelInfo{
+			GoVersion:      runtime.Version(),
+			Pid:            os.Getpid(),
+			StartedAt:      startedAt.UnixMilli(),
+			DataDir:        s.Cfg.DataDir,
+			Listen:         s.Cfg.Listen,
+			TLS:            s.Cfg.TLS.Cert != "",
+			AuthMode:       s.Cfg.Auth.Mode,
+			SessionHours:   s.Cfg.Auth.SessionHours,
+			TrustedProxies: len(s.Cfg.TrustedProxies),
+			Features: featureInfo{
+				Smart:          s.Cfg.Storage.Smart,
+				Snapraid:       s.Cfg.Storage.Snapraid.Config != "",
+				Plex:           s.Cfg.Plex.Token != "",
+				Apps:           len(s.Cfg.Apps),
+				MinecraftRoot:  s.Cfg.Minecraft.Root,
+				MinecraftRunAs: s.Cfg.Minecraft.RunAs,
+				Power:          s.Cfg.Power.Allow,
+				UpdateRepo:     s.Cfg.Update.Repo,
+			},
+		},
 	})
 }
 

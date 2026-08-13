@@ -13,6 +13,30 @@ export interface SystemInfo {
   mock: boolean;
 }
 
+export interface FeatureInfo {
+  smart: boolean;
+  snapraid: boolean;
+  plex: boolean;
+  apps: number;
+  minecraftRoot: string;
+  minecraftRunAs?: string;
+  power: boolean;
+  updateRepo?: string;
+}
+
+export interface PanelInfo {
+  goVersion: string;
+  pid: number;
+  startedAt: number;
+  dataDir: string;
+  listen: string;
+  tls: boolean;
+  authMode: string;
+  sessionHours: number;
+  trustedProxies: number;
+  features: FeatureInfo;
+}
+
 export interface NetRate {
   name: string;
   rxBps: number;

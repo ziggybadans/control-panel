@@ -1,13 +1,13 @@
 // Settings: appearance customization, dashboard reset, safety reference,
 // updates, power actions, and about.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { UpdateStatus } from "../api/types";
-import { fmtBytes } from "../lib/format";
+import { fmtBytes, fmtDuration } from "../lib/format";
 import { usePrefs, type Accent, type Density, type Theme } from "../state/prefs";
-import { useSystem } from "../state/system";
+import { usePanel, useSystem } from "../state/system";
 import { Card, Spinner } from "../ui/bits";
 import { useConfirm } from "../ui/Confirm";
 import { Icon } from "../ui/Icon";
@@ -92,37 +92,6 @@ export function SettingsPage() {
             <div className="small faint">
               Preferences are stored on the server, so they follow you to any browser.
             </div>
-          </div>
-        </Card>
-
-        <Card title="Safety model">
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }} className="small">
-            <div className="row">
-              <span className="badge neutral">confirm</span>
-              <span className="muted">
-                service stop/restart · Minecraft stop/restart · kick
-              </span>
-            </div>
-            <div className="row">
-              <span className="badge crit">typed confirm</span>
-              <span className="muted">
-                force-kill · backup restore/delete · ban · snapraid sync/scrub ·
-                reboot/shutdown
-              </span>
-            </div>
-            <hr className="divider" />
-            <p className="muted">
-              Confirmations are enforced server-side: dangerous endpoints reject
-              requests whose <span className="mono">X-Confirm</span> header does not
-              echo the exact target. The agent only executes a fixed allowlist of
-              operations — no free-form commands — and every action lands in the{" "}
-              <a href="#/activity">audit log</a>.
-            </p>
-            <p className="muted">
-              Backup restores keep the replaced data, snapraid runs stream their
-              output, and metric collection is read-only and idles when no client is
-              connected.
-            </p>
           </div>
         </Card>
 
@@ -355,36 +324,249 @@ function PowerCard() {
 }
 
 function AboutCard() {
-  const { info } = useSystem();
+  const { info, uptime } = useSystem();
+  const panel = usePanel();
   const toast = useToast();
+  const [showSafety, setShowSafety] = useState(false);
+  const f = panel?.features;
+
+  const integrations: { label: string; on: boolean }[] = f
+    ? [
+        { label: "SMART", on: f.smart },
+        { label: "snapraid", on: f.snapraid },
+        { label: "Plex", on: f.plex },
+        { label: `${f.apps} media app${f.apps === 1 ? "" : "s"}`, on: f.apps > 0 },
+        { label: "power control", on: f.power },
+        { label: "self-update", on: !!f.updateRepo },
+      ]
+    : [];
+
   return (
     <Card title="About">
-      <dl className="kv">
-        <dt>Panel version</dt>
-        <dd className="num">{info?.version ?? "—"}</dd>
-        <dt>Mode</dt>
-        <dd>{info?.mock ? "mock data" : "live"}</dd>
-        <dt>Host</dt>
-        <dd>{info?.hostname ?? "—"}</dd>
-        <dt>OS</dt>
-        <dd>{info?.os ?? "—"}</dd>
-      </dl>
-      <div className="row" style={{ marginTop: 12 }}>
-        <button
-          className="btn btn-sm"
-          onClick={async () => {
-            try {
-              await api("/api/auth/logout", { method: "POST" });
-            } finally {
-              toast("ok", "signed out");
-              window.location.reload();
-            }
-          }}
-        >
-          <Icon name="logout" size={12} />
-          Sign out
-        </button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>
+          <div className="label" style={{ marginBottom: 6 }}>
+            Panel
+          </div>
+          <dl className="kv">
+            <dt>Version</dt>
+            <dd className="num">
+              {info?.version ?? "—"}
+              {info?.mock && <span className="badge neutral" style={{ marginLeft: 8 }}>mock data</span>}
+            </dd>
+            <dt>Runtime</dt>
+            <dd className="num">{panel ? `${panel.goVersion} · pid ${panel.pid}` : "—"}</dd>
+            <dt>Panel uptime</dt>
+            <dd className="num">{panel ? fmtDuration(Date.now() - panel.startedAt) : "—"}</dd>
+            <dt>Listen</dt>
+            <dd className="num">
+              {panel?.listen ?? "—"}
+              {panel && (
+                <span className={panel.tls ? "badge ok" : "badge neutral"} style={{ marginLeft: 8 }}>
+                  {panel.tls ? "TLS" : "no TLS"}
+                </span>
+              )}
+            </dd>
+            <dt>Auth</dt>
+            <dd>
+              {panel
+                ? panel.authMode === "none"
+                  ? "disabled"
+                  : `password · ${Math.round(panel.sessionHours / 24)}d sessions`
+                : "—"}
+            </dd>
+            <dt>Data dir</dt>
+            <dd className="mono small">{panel?.dataDir ?? "—"}</dd>
+            {f?.updateRepo && (
+              <>
+                <dt>Update repo</dt>
+                <dd className="mono small">{f.updateRepo}</dd>
+              </>
+            )}
+          </dl>
+        </div>
+
+        <div>
+          <div className="label" style={{ marginBottom: 6 }}>
+            Host
+          </div>
+          <dl className="kv">
+            <dt>Hostname</dt>
+            <dd>{info?.hostname ?? "—"}</dd>
+            <dt>OS</dt>
+            <dd title={info?.os}>{info?.os ?? "—"}</dd>
+            <dt>Kernel</dt>
+            <dd className="num">
+              {info ? `${info.kernel} · ${info.arch}` : "—"}
+            </dd>
+            <dt>Uptime</dt>
+            <dd className="num">{uptime}</dd>
+          </dl>
+        </div>
+
+        {integrations.length > 0 && (
+          <div>
+            <div className="label" style={{ marginBottom: 6 }}>
+              Integrations
+            </div>
+            <div className="row wrap" style={{ gap: 6 }}>
+              {integrations.map((i) => (
+                <span key={i.label} className={i.on ? "badge ok" : "badge neutral"}>
+                  {i.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="row">
+          <button className="btn btn-sm" onClick={() => setShowSafety(true)}>
+            <Icon name="lock" size={12} />
+            Safety model
+          </button>
+          <a
+            className="btn btn-sm"
+            href="https://github.com/ziggybadans/control-panel"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Icon name="external" size={12} />
+            GitHub
+          </a>
+          <button
+            className="btn btn-sm"
+            onClick={async () => {
+              try {
+                await api("/api/auth/logout", { method: "POST" });
+              } finally {
+                toast("ok", "signed out");
+                window.location.reload();
+              }
+            }}
+          >
+            <Icon name="logout" size={12} />
+            Sign out
+          </button>
+        </div>
       </div>
+      {showSafety && <SafetyModal onClose={() => setShowSafety(false)} />}
     </Card>
+  );
+}
+
+/** The full safety reference, opened from the About card. */
+function SafetyModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="modal wide" role="dialog" aria-modal="true" aria-label="Safety model">
+        <div className="modal-h">
+          <Icon name="lock" size={16} />
+          Safety model
+        </div>
+        <div
+          className="modal-b small"
+          style={{ maxHeight: "62vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}
+        >
+          <div>
+            <div className="label" style={{ marginBottom: 6 }}>
+              Confirmation tiers
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="row">
+                <span className="badge neutral">confirm</span>
+                <span className="muted">
+                  service stop/restart · Minecraft stop/restart · kick
+                </span>
+              </div>
+              <div className="row">
+                <span className="badge crit">typed confirm</span>
+                <span className="muted">
+                  force-kill · backup restore/delete · ban · snapraid sync/scrub ·
+                  folder delete · reboot/shutdown · panel updates
+                </span>
+              </div>
+            </div>
+            <p className="muted" style={{ marginTop: 8 }}>
+              Confirmations are enforced <em>server-side</em>: dangerous endpoints
+              reject any request whose <span className="mono">X-Confirm</span> header
+              does not echo the exact target (HTTP 428). The dialogs in this UI are
+              just the way that header gets filled in — a buggy or malicious page
+              cannot skip the check.
+            </p>
+          </div>
+
+          <div>
+            <div className="label" style={{ marginBottom: 6 }}>
+              Command execution
+            </div>
+            <p className="muted">
+              The panel only executes a fixed allowlist of operations, built as
+              argv arrays — never shell strings. systemd verbs run only against
+              the units listed in config, snapraid runs only its four known
+              subcommands, and Minecraft servers are supervised child processes
+              (optionally de-privileged to <span className="mono">run_as</span>).
+              There is no general-purpose command endpoint.
+            </p>
+          </div>
+
+          <div>
+            <div className="label" style={{ marginBottom: 6 }}>
+              File confinement
+            </div>
+            <p className="muted">
+              Every file operation resolves paths inside its configured root —
+              lexically (no <span className="mono">..</span>) and physically
+              (symlinks may not lead outside). Uploads refuse to overwrite unless
+              asked, archives are extracted with zip-bomb and path-escape guards,
+              and backup restores keep the replaced data.
+            </p>
+          </div>
+
+          <div>
+            <div className="label" style={{ marginBottom: 6 }}>
+              Authentication &amp; transport
+            </div>
+            <p className="muted">
+              Login uses argon2id password hashing with rate limiting (5 tries
+              per 15 minutes per address). Sessions are random 256-bit tokens in
+              an HttpOnly cookie. Mutations require the{" "}
+              <span className="mono">X-CP</span> header and a same-origin{" "}
+              <span className="mono">Origin</span>, which cross-site forms cannot
+              produce. A strict CSP and frame-ancestors deny embedding. Updates
+              install only from the pinned GitHub repo and are sha256-verified
+              against the release manifest.
+            </p>
+          </div>
+
+          <div>
+            <div className="label" style={{ marginBottom: 6 }}>
+              Audit
+            </div>
+            <p className="muted">
+              Every mutating action — who, what, when, from where, and whether it
+              succeeded — is appended to a JSONL audit log in the data dir and
+              visible on the <a href="#/activity">Activity</a> page. Metric
+              collection is read-only and idles when no client is connected.
+            </p>
+          </div>
+        </div>
+        <div className="modal-f">
+          <button className="btn btn-primary" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
