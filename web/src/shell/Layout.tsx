@@ -19,6 +19,7 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/plex", label: "Plex", icon: "plex" },
   { to: "/apps", label: "Apps", icon: "download" },
   { to: "/terminal", label: "Terminal", icon: "terminal" },
+  { to: "/tasks", label: "Tasks", icon: "clock" },
   { to: "/activity", label: "Activity", icon: "activity" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
@@ -33,6 +34,7 @@ const TITLES: Record<string, string> = {
   "/plex": "Plex",
   "/apps": "Apps",
   "/terminal": "Terminal",
+  "/tasks": "Tasks",
   "/activity": "Activity",
   "/settings": "Settings",
 };

@@ -3,10 +3,12 @@
 package jobs
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"os/exec"
 	"sync"
 	"time"
 )
@@ -176,6 +178,27 @@ func (r *Runner) Get(id string) (View, bool) {
 		}
 	}
 	return View{}, false
+}
+
+// RunStreaming executes argv, feeding each combined-output line to out.
+// Shared by HTTP handlers and the scheduler (both only ever pass argv
+// built from the panel's validated allowlists).
+func RunStreaming(ctx context.Context, argv []string, out func(string)) error {
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	pipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	cmd.Stderr = cmd.Stdout
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	sc := bufio.NewScanner(pipe)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for sc.Scan() {
+		out(sc.Text())
+	}
+	return cmd.Wait()
 }
 
 // Cancel stops the running job if its ID matches.

@@ -523,6 +523,10 @@ function SafetyModal({ onClose }: { onClose: () => void }) {
               the units listed in config, snapraid runs only its four known
               subcommands, and Minecraft servers are supervised child processes
               (optionally de-privileged to <span className="mono">run_as</span>).
+              Scheduled tasks are limited to this same allowlist: they run
+              unattended without per-action confirmation, but creating one is
+              audited and so is every execution (source{" "}
+              <span className="mono">scheduler</span>).
             </p>
             <p className="muted">
               The <b>Terminal</b> page is the one deliberate exception: it is a

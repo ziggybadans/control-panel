@@ -34,6 +34,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/metrics"
 	"github.com/ziggybadans/control-panel/internal/plex"
 	"github.com/ziggybadans/control-panel/internal/prefs"
+	"github.com/ziggybadans/control-panel/internal/sched"
 	"github.com/ziggybadans/control-panel/internal/services"
 	"github.com/ziggybadans/control-panel/internal/storage"
 	cpterm "github.com/ziggybadans/control-panel/internal/term"
@@ -208,6 +209,33 @@ func main() {
 	termMgr := cpterm.NewManager(termLauncher, cfg.Terminal.MaxSessions,
 		time.Duration(cfg.Terminal.IdleTimeoutMin)*time.Minute)
 
+	// Scheduled tasks: allowlisted panel actions on a recurrence. Every
+	// execution is audited with "scheduler" as the source.
+	auditLog := audit.New(cfg.DataDir)
+	svcUnits := cfg.Services.Units
+	if len(svcUnits) == 0 {
+		svcUnits = services.DefaultUnits
+	}
+	schedEngine := sched.NewEngine(cfg.DataDir, &schedExecutor{
+		mc:       mcService,
+		services: serviceProv,
+		storage:  storageProv,
+		runner:   runner,
+		units:    svcUnits,
+	})
+	schedEngine.OnRun = func(s sched.Schedule, detail string, err error) {
+		e := audit.Entry{
+			IP: "scheduler", Action: "sched.run", Target: s.Name,
+			Detail: s.Action + ": " + detail, OK: err == nil,
+		}
+		if err != nil {
+			e.Err = err.Error()
+			e.Detail = s.Action
+		}
+		auditLog.Record(e)
+	}
+	go schedEngine.Run(ctx)
+
 	// Service state watcher: cheap poll, published to all SSE clients.
 	go func() {
 		t := time.NewTicker(5 * time.Second)
@@ -233,7 +261,7 @@ func main() {
 		Bus:      bus,
 		Sessions: auth.NewSessions(cfg.SessionTTL(), cfg.DataDir),
 		Limiter:  auth.NewLoginLimiter(5, 15*time.Minute),
-		Audit:    audit.New(cfg.DataDir),
+		Audit:    auditLog,
 		Prefs:    prefs.New(cfg.DataDir),
 		Jobs:     runner,
 		Sampler:  sampler,
@@ -247,6 +275,7 @@ func main() {
 		Fans:     fansCtl,
 		Files:    filesSvc,
 		Term:     termMgr,
+		Sched:    schedEngine,
 		Power:    powerFn,
 	})
 

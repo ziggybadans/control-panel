@@ -18,6 +18,7 @@ import { MinecraftPage } from "./pages/Minecraft";
 import { MCServerPage } from "./pages/McServer";
 import { PlexPage } from "./pages/Plex";
 import { AppsPage } from "./pages/Apps";
+import { TasksPage } from "./pages/Tasks";
 import { ActivityPage } from "./pages/Activity";
 import { SettingsPage } from "./pages/Settings";
 import { Spinner } from "./ui/bits";
@@ -59,6 +60,7 @@ const router = createHashRouter([
           </Suspense>
         ),
       },
+      { path: "/tasks", element: <TasksPage /> },
       { path: "/activity", element: <ActivityPage /> },
       { path: "/settings", element: <SettingsPage /> },
       { path: "*", element: <Dashboard /> },

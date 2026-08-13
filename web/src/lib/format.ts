@@ -62,10 +62,15 @@ export function fmtDateTime(ms: number): string {
 
 export function fmtRelative(ms: number): string {
   const delta = Date.now() - ms;
+  if (delta < -60_000) return "in " + fmtSpan(-delta);
   if (delta < 60_000) return "just now";
-  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)}m ago`;
-  if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)}h ago`;
-  return `${Math.floor(delta / 86_400_000)}d ago`;
+  return fmtSpan(delta) + " ago";
+}
+
+function fmtSpan(delta: number): string {
+  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)}m`;
+  if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)}h`;
+  return `${Math.floor(delta / 86_400_000)}d`;
 }
 
 export function fmtTemp(c: number | undefined): string {

@@ -3,8 +3,9 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../../api/client";
-import type { BackupInfo, Job, MCServer } from "../../api/types";
+import type { BackupInfo, Job, MCServer, SchedulesResponse } from "../../api/types";
 import { fmtBytes, fmtDateTime, fmtRelative } from "../../lib/format";
 import { useJobs } from "../../state/live";
 import { Spinner } from "../../ui/bits";
@@ -12,6 +13,65 @@ import { useConfirm } from "../../ui/Confirm";
 import { Icon } from "../../ui/Icon";
 import { useToast } from "../../ui/Toast";
 import { JobPanel } from "../Storage";
+import { TaskEditor } from "../Tasks";
+
+/**
+ * Auto-backup status for this server: shows the mc.backup schedule when one
+ * exists, or offers to create one (prefilled daily/keep-7 task editor).
+ */
+function AutoBackupStrip({ id }: { id: string }) {
+  const [creating, setCreating] = useState(false);
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["schedules"],
+    queryFn: () => api<SchedulesResponse>("/api/schedules"),
+    staleTime: 15_000,
+  });
+  const schedule = (data?.schedules ?? []).find(
+    (s) => s.action === "mc.backup" && s.server === id,
+  );
+
+  return (
+    <div className="row small" style={{ gap: 8 }}>
+      <Icon name="clock" size={13} className="faint" />
+      {schedule ? (
+        <>
+          <span className={schedule.enabled ? "muted" : "faint"}>
+            Auto backup: {schedule.every ? `every ${schedule.every}` : schedule.daily ? `daily at ${schedule.daily}` : `weekly ${schedule.weekly}`}
+            {schedule.keep ? ` · keep ${schedule.keep}` : ""}
+            {!schedule.enabled && " · disabled"}
+          </span>
+          <Link to="/tasks" className="small">
+            Manage →
+          </Link>
+        </>
+      ) : (
+        <>
+          <span className="faint">No automatic backups for this server.</span>
+          <button className="btn btn-ghost btn-sm" onClick={() => setCreating(true)}>
+            Set up auto backup
+          </button>
+        </>
+      )}
+      {creating && (
+        <TaskEditor
+          initial={null}
+          preset={{
+            name: `Auto backup ${id}`,
+            action: "mc.backup",
+            server: id,
+            daily: "04:00",
+            keep: 7,
+          }}
+          onClose={(changed) => {
+            setCreating(false);
+            if (changed) qc.invalidateQueries({ queryKey: ["schedules"] });
+          }}
+        />
+      )}
+    </div>
+  );
+}
 
 export function BackupsTab({ id, server }: { id: string; server: MCServer }) {
   const toast = useToast();
@@ -119,6 +179,8 @@ export function BackupsTab({ id, server }: { id: string; server: MCServer }) {
           onToggle={() => setExpandedJob(expandedJob === backupJob.id ? null : backupJob.id)}
         />
       )}
+
+      <AutoBackupStrip id={id} />
 
       {isLoading ? (
         <Spinner />

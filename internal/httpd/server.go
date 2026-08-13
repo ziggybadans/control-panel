@@ -22,6 +22,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/metrics"
 	"github.com/ziggybadans/control-panel/internal/plex"
 	"github.com/ziggybadans/control-panel/internal/prefs"
+	"github.com/ziggybadans/control-panel/internal/sched"
 	"github.com/ziggybadans/control-panel/internal/services"
 	"github.com/ziggybadans/control-panel/internal/storage"
 	"github.com/ziggybadans/control-panel/internal/term"
@@ -48,6 +49,7 @@ type Deps struct {
 	Fans     *fans.Controller
 	Files    *files.Service
 	Term     *term.Manager
+	Sched    *sched.Engine
 	// Power executes "reboot" or "shutdown" (nil = unsupported platform).
 	Power func(action string) error
 }
@@ -153,6 +155,13 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/minecraft/{id}/backups/{name}/restore", s.handleMCBackupRestore)
 	m.HandleFunc("DELETE /api/minecraft/{id}/backups/{name}", s.handleMCBackupDelete)
 	m.HandleFunc("PUT /api/minecraft/{id}/config", s.handleMCConfig)
+
+	// Scheduled tasks.
+	m.HandleFunc("GET /api/schedules", s.handleSchedules)
+	m.HandleFunc("POST /api/schedules", s.handleScheduleCreate)
+	m.HandleFunc("PUT /api/schedules/{id}", s.handleScheduleUpdate)
+	m.HandleFunc("DELETE /api/schedules/{id}", s.handleScheduleDelete)
+	m.HandleFunc("POST /api/schedules/{id}/run", s.handleScheduleRun)
 
 	// Misc.
 	m.HandleFunc("GET /api/prefs", s.handlePrefsGet)

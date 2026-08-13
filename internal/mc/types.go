@@ -204,6 +204,9 @@ type Service interface {
 	CreateBackup(id string) (*jobs.View, error)
 	RestoreBackup(id, name string) error
 	DeleteBackup(id, name string) error
+	// PruneBackups deletes the oldest backups beyond keep (scheduler
+	// retention). Returns the removed archive names.
+	PruneBackups(id string, keep int) ([]string, error)
 
 	UpdateConfig(id string, patch ConfigPatch) error
 	Rescan() error

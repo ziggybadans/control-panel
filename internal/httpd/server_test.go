@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/metrics"
 	"github.com/ziggybadans/control-panel/internal/plex"
 	"github.com/ziggybadans/control-panel/internal/prefs"
+	"github.com/ziggybadans/control-panel/internal/sched"
 	"github.com/ziggybadans/control-panel/internal/services"
 	"github.com/ziggybadans/control-panel/internal/storage"
 	"github.com/ziggybadans/control-panel/internal/term"
@@ -52,8 +54,33 @@ func testServer(t *testing.T, authMode string) *Server {
 			{Name: "data", Path: dir},
 			{Name: "ro", Path: dir, ReadOnly: true},
 		}),
-		Term: term.NewManager(term.NewMockLauncher(), 2, time.Minute),
+		Term:  term.NewManager(term.NewMockLauncher(), 2, time.Minute),
+		Sched: sched.NewEngine(dir, permissiveExec{}),
 	})
+}
+
+// permissiveExec accepts every schedule target (scheduler API tests).
+type permissiveExec struct{}
+
+func (permissiveExec) Run(ctx context.Context, s sched.Schedule) (string, error) { return "ok", nil }
+func (permissiveExec) ValidateTarget(s sched.Schedule) error                     { return nil }
+
+func TestScheduleValidationOverHTTP(t *testing.T) {
+	h := testServer(t, "none").Handler()
+	hdr := map[string]string{"X-CP": "1"}
+
+	// An action outside the allowlist is rejected outright.
+	rec := doBody(h, "POST", "/api/schedules",
+		`{"name":"evil","enabled":true,"every":"6h","action":"shell.exec","command":"rm -rf /"}`, hdr)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("invalid action: got %d, want 422", rec.Code)
+	}
+	// A valid backup schedule is accepted.
+	rec = doBody(h, "POST", "/api/schedules",
+		`{"name":"nightly","enabled":true,"daily":"04:00","action":"mc.backup","server":"survival","keep":7,"nextRun":0}`, hdr)
+	if rec.Code != http.StatusCreated {
+		t.Errorf("valid schedule: got %d body %s", rec.Code, rec.Body.String())
+	}
 }
 
 func do(h http.Handler, method, path string, headers map[string]string) *httptest.ResponseRecorder {

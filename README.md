@@ -65,6 +65,10 @@ systemd service; accessed from any browser on the LAN.
   manager** with metadata read from the jars and enable/disable toggles,
   **server jar updates** with rollback, and an embedded **map viewer** when
   Dynmap / BlueMap / squaremap / Pl3xMap is installed.
+- **Scheduled tasks** — automatic Minecraft backups (with keep-N retention),
+  service restarts, snapraid sync/scrub, and console commands on interval,
+  daily, or weekly recurrences. Tasks only run the panel's own allowlisted
+  actions — never arbitrary commands — retry failures, and audit every run.
 - **Customizable dashboard** — reorder / resize / hide widgets, accent color,
   density, dark & light themes. Preferences stored server-side, so they follow
   you across machines.

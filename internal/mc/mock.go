@@ -85,7 +85,7 @@ func NewMockService(bus *events.Bus, runner *jobs.Runner, dataDir string) Servic
 			ID: "atm10", Name: "atm10", Dir: "/srv/minecraft/atm10",
 			State: StateStopped, Version: "1.21.1", Software: "NeoForge", Port: 25567,
 			MaxPlayers: 8, Mem: "10G", Java: "java",
-			JVMArgs: []string{"-Dfml.readTimeout=180"},
+			JVMArgs:      []string{"-Dfml.readTimeout=180"},
 			EulaAccepted: false, OnlinePlayers: []string{},
 		},
 		props:   defaultProps("atm10", 25567, "All the Mods 10", true),
@@ -176,7 +176,7 @@ func (m *mockService) Start(id string) error {
 
 	go func() {
 		lines := []struct {
-			delay time.Duration
+			delay      time.Duration
 			level, msg string
 		}{
 			{200 * time.Millisecond, "INFO", "Starting minecraft server version " + s.info.Version},
@@ -731,6 +731,28 @@ func (m *mockService) DeleteBackup(id, name string) error {
 }
 
 // --- config -----------------------------------------------------------------
+
+func (m *mockService) PruneBackups(id string, keep int) ([]string, error) {
+	if keep <= 0 {
+		return nil, nil
+	}
+	s, err := m.sv(id)
+	if err != nil {
+		return nil, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sort.Slice(s.backups, func(i, j int) bool { return s.backups[i].CreatedAt > s.backups[j].CreatedAt })
+	if len(s.backups) <= keep {
+		return nil, nil
+	}
+	var removed []string
+	for _, b := range s.backups[keep:] {
+		removed = append(removed, b.Name)
+	}
+	s.backups = s.backups[:keep]
+	return removed, nil
+}
 
 func (m *mockService) UpdateConfig(id string, patch ConfigPatch) error {
 	s, err := m.sv(id)

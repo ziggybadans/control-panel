@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/ziggybadans/control-panel/internal/jobs"
 	"github.com/ziggybadans/control-panel/internal/mcfiles"
@@ -72,6 +73,32 @@ func (m *Manager) ImportServer(id, mem, zipPath string) (*jobs.View, error) {
 		out(fmt.Sprintf("imported %q — review its settings before starting", id))
 		return nil
 	})
+}
+
+// PruneBackups deletes the oldest backups beyond keep. keep <= 0 keeps
+// everything. Only regular scheduled/manual archives are considered — the
+// "replaced-*" safety copies RestoreBackup leaves behind don't match the
+// backup name pattern and are never touched.
+func (m *Manager) PruneBackups(id string, keep int) ([]string, error) {
+	if keep <= 0 {
+		return nil, nil
+	}
+	backups, err := m.Backups(id)
+	if err != nil {
+		return nil, err
+	}
+	if len(backups) <= keep {
+		return nil, nil
+	}
+	sort.Slice(backups, func(i, j int) bool { return backups[i].CreatedAt > backups[j].CreatedAt })
+	var removed []string
+	for _, b := range backups[keep:] {
+		if err := m.DeleteBackup(id, b.Name); err != nil {
+			return removed, err
+		}
+		removed = append(removed, b.Name)
+	}
+	return removed, nil
 }
 
 // flattenSingleDir handles the common "zipped the folder, not its contents"

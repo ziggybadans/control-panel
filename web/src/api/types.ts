@@ -410,6 +410,38 @@ export interface TerminalStatus {
   sessions?: TerminalSession[] | null;
 }
 
+// Scheduled tasks
+
+export type ScheduleAction =
+  | "mc.backup"
+  | "mc.restart"
+  | "mc.command"
+  | "service.restart"
+  | "snapraid.sync"
+  | "snapraid.scrub";
+
+export interface Schedule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  every?: string; // "6h"
+  daily?: string; // "04:00"
+  weekly?: string; // "mon 04:30"
+  action: ScheduleAction;
+  server?: string;
+  unit?: string;
+  command?: string;
+  keep?: number;
+  onlyIfRunning?: boolean;
+  nextRun: number;
+  lastRun?: number;
+  lastResult?: string;
+}
+
+export interface SchedulesResponse {
+  schedules: Schedule[] | null;
+}
+
 // Jobs / audit
 
 export interface Job {
