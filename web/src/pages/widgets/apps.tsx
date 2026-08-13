@@ -131,6 +131,14 @@ export function FansWidget() {
 
 // --- Storage ----------------------------------------------------------------
 
+/** Whether a mount's device is the disk itself or one of its partitions. */
+function isPartOf(device: string, disk: string): boolean {
+  const base = device.replace(/^\/dev\//, "");
+  if (!base.startsWith(disk)) return false;
+  const rest = base.slice(disk.length);
+  return rest === "" || /^p?\d+$/.test(rest); // sde2, nvme0n1p2, whole disk
+}
+
 export function StorageWidget() {
   const { data } = useQuery({
     queryKey: ["storage"],
@@ -140,10 +148,15 @@ export function StorageWidget() {
   const m = useLatestMetrics();
   const pools = data?.pools ?? [];
   const disks = data?.disks ?? [];
+  const mounts = data?.mounts ?? [];
   // Pool branches carry per-disk usage; index them by underlying device.
   const branchByDev = new Map(
     pools.flatMap((p) => p.branches ?? []).map((b) => [b.device, b]),
   );
+  // Non-pool filesystems (root, boot, parity…) attach to their parent disk
+  // as sub-rows, so system SSD partitions get usage bars too.
+  const mountsFor = (disk: string) =>
+    mounts.filter((mt) => isPartOf(mt.device, disk));
   const liveTemp = (name: string): number | undefined => {
     const t = m?.temps.find((t) => t.label === `drivetemp ${name}`);
     return t?.c;
@@ -166,34 +179,62 @@ export function StorageWidget() {
       <div className="mini-rows">
         {disks.map((d) => {
           const br = branchByDev.get(d.name);
+          const parts = mountsFor(d.name);
           const temp = liveTemp(d.name) ?? d.tempC;
           return (
-            <div key={d.name} className="mini-row" title={d.model}>
-              <DiskHealthDot smart={d.smart} />
-              <span className="mono small" style={{ minWidth: 62 }}>
-                {d.name}
-              </span>
-              {br ? (
-                <span style={{ flex: "1 1 56px", minWidth: 40 }}>
-                  <CapacityBar used={br.used} total={br.total} />
+            <div key={d.name}>
+              <div className="mini-row" title={d.model}>
+                <DiskHealthDot smart={d.smart} />
+                <span className="mono small" style={{ minWidth: 62 }}>
+                  {d.name}
                 </span>
-              ) : (
-                <span className="small faint truncate" style={{ flex: "1 1 56px", minWidth: 0 }}>
-                  {d.rotational ? "hdd" : "ssd"}
-                </span>
-              )}
-              <span className="right row" style={{ gap: 10, flex: "none" }}>
-                {temp !== undefined && (
-                  <span
-                    className={`small num ${tempLevel(d.rotational ? `drivetemp ${d.name}` : "nvme", temp)}`}
-                  >
-                    {fmtTemp(temp)}
+                {br ? (
+                  <span style={{ flex: "1 1 56px", minWidth: 40 }}>
+                    <CapacityBar used={br.used} total={br.total} />
+                  </span>
+                ) : (
+                  <span className="small faint truncate" style={{ flex: "1 1 56px", minWidth: 0 }}>
+                    {d.rotational ? "hdd" : "ssd"}
                   </span>
                 )}
-                <span className="small muted num" style={{ minWidth: 52, textAlign: "right" }}>
-                  {br ? fmtBytes(br.used, 1) : fmtBytes(d.sizeBytes, 0)}
+                <span className="right row" style={{ gap: 10, flex: "none" }}>
+                  {temp !== undefined && (
+                    <span
+                      className={`small num ${tempLevel(d.rotational ? `drivetemp ${d.name}` : "nvme", temp)}`}
+                    >
+                      {fmtTemp(temp)}
+                    </span>
+                  )}
+                  <span className="small muted num" style={{ minWidth: 52, textAlign: "right" }}>
+                    {br ? fmtBytes(br.used, 1) : fmtBytes(d.sizeBytes, 0)}
+                  </span>
                 </span>
-              </span>
+              </div>
+              {/* Partitions with their own filesystems (root, boot, parity…). */}
+              {parts.map((mt) => (
+                <div
+                  key={mt.mount}
+                  className="mini-row"
+                  style={{ paddingLeft: 22 }}
+                  title={`${mt.device} · ${mt.fsType}`}
+                >
+                  <span className="mono small faint" style={{ minWidth: 52 }}>
+                    {mt.device.replace(/^\/dev\//, "")}
+                  </span>
+                  <span className="small muted truncate" style={{ minWidth: 0, flex: "0 1 auto" }}>
+                    {mt.mount}
+                  </span>
+                  <span style={{ flex: "1 1 40px", minWidth: 32 }}>
+                    <CapacityBar used={mt.used} total={mt.total} />
+                  </span>
+                  <span
+                    className="right small muted num"
+                    style={{ flex: "none", minWidth: 96, textAlign: "right" }}
+                  >
+                    {fmtBytes(mt.used, 1)} / {fmtBytes(mt.total, 0)}
+                  </span>
+                </div>
+              ))}
             </div>
           );
         })}
