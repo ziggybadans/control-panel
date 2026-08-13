@@ -136,9 +136,22 @@ func (p *hwmonProvider) Fans() []Fan {
 	out := make([]Fan, 0, len(p.order))
 	for _, id := range p.order {
 		f := p.fans[id]
-		out = append(out, Fan{ID: f.id, Label: f.label, HasRPM: f.tachPath != ""})
+		out = append(out, Fan{
+			ID:       f.id,
+			Label:    f.label,
+			HasRPM:   f.tachPath != "",
+			Writable: isWritable(f.pwmPath),
+		})
 	}
 	return out
+}
+
+// isWritable reports whether the kernel created the PWM attribute with a
+// write bit. Drivers that gate control by vendor (nct6683) expose 0444
+// files; even root cannot usefully write those.
+func isWritable(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().Perm()&0o200 != 0
 }
 
 func (p *hwmonProvider) Sensors() []Sensor {
@@ -233,10 +246,13 @@ func (p *hwmonProvider) Release(id string) error {
 
 func writeSysfs(path, value string) error {
 	err := os.WriteFile(path, []byte(value), 0o644)
-	if errors.Is(err, syscall.EROFS) || errors.Is(err, os.ErrPermission) {
-		return fmt.Errorf("write %s: %w — if the panel runs under systemd, its unit must "+
-			"allow sysfs writes for fan control (see ProtectKernelTunables in "+
-			"deploy/control-panel.service)", path, err)
+	if errors.Is(err, syscall.EROFS) {
+		return fmt.Errorf("write %s: %w — sysfs is mounted read-only; the systemd unit "+
+			"must not set ProtectKernelTunables=true (see deploy/control-panel.service)", path, err)
+	}
+	if errors.Is(err, os.ErrPermission) {
+		return fmt.Errorf("write %s: %w — the kernel driver refused the write "+
+			"(some drivers gate PWM control by board vendor)", path, err)
 	}
 	return err
 }

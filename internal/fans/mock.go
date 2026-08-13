@@ -20,6 +20,7 @@ type mockProvider struct {
 type mockFan struct {
 	id, label string
 	maxRPM    int
+	readOnly  bool
 	taken     bool
 	manualPct float64
 }
@@ -31,6 +32,8 @@ func NewMockProvider() Provider {
 		{id: "mock:pwm2", label: "Front intake 1", maxRPM: 1500},
 		{id: "mock:pwm3", label: "Front intake 2", maxRPM: 1500},
 		{id: "mock:pwm4", label: "Rear exhaust", maxRPM: 1350},
+		// Demonstrates a driver that gates PWM writes (nct6683-style).
+		{id: "mock:pwm5", label: "Chipset fan", maxRPM: 3000, readOnly: true},
 	} {
 		p.fans[f.id] = f
 		p.order = append(p.order, f.id)
@@ -65,7 +68,7 @@ func (p *mockProvider) Fans() []Fan {
 	out := make([]Fan, 0, len(p.order))
 	for _, id := range p.order {
 		f := p.fans[id]
-		out = append(out, Fan{ID: f.id, Label: f.label, HasRPM: true})
+		out = append(out, Fan{ID: f.id, Label: f.label, HasRPM: true, Writable: !f.readOnly})
 	}
 	return out
 }

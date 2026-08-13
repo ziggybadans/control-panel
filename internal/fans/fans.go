@@ -16,11 +16,15 @@ import (
 	"sort"
 )
 
-// Fan is one controllable PWM output.
+// Fan is one PWM output.
 type Fan struct {
 	ID     string `json:"id"`
 	Label  string `json:"label"`
 	HasRPM bool   `json:"hasRpm"`
+	// Writable reports whether the kernel exposes the PWM for writing.
+	// Some drivers (nct6683) gate writes to whitelisted vendors and create
+	// the attribute read-only: monitoring works, control does not.
+	Writable bool `json:"writable"`
 }
 
 // State is the live view of one fan, published on the SSE stream.
@@ -39,6 +43,7 @@ type State struct {
 	// Failsafe is set when the curve sensor was unreadable and the fan was
 	// driven to 100%.
 	Failsafe bool   `json:"failsafe,omitempty"`
+	Writable bool   `json:"writable"`
 	Err      string `json:"err,omitempty"`
 }
 

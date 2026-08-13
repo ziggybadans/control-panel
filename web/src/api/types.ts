@@ -87,6 +87,7 @@ export interface FanState {
   targetPct?: number;
   sourceTempC?: number;
   failsafe?: boolean;
+  writable: boolean;
   err?: string;
 }
 

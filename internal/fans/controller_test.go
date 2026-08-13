@@ -15,6 +15,7 @@ type stubProvider struct {
 	duty     map[string]float64
 	taken    map[string]bool
 	released []string
+	readOnly bool
 }
 
 func newStub() *stubProvider {
@@ -26,7 +27,7 @@ func newStub() *stubProvider {
 }
 
 func (s *stubProvider) Fans() []Fan {
-	return []Fan{{ID: "f1", Label: "Fan 1", HasRPM: true}}
+	return []Fan{{ID: "f1", Label: "Fan 1", HasRPM: true, Writable: !s.readOnly}}
 }
 
 func (s *stubProvider) Sensors() []Sensor {
@@ -189,6 +190,27 @@ func TestControlDisabled(t *testing.T) {
 	c.tick()
 	if p.taken["f1"] {
 		t.Error("disabled controller must never write PWM")
+	}
+}
+
+func TestReadOnlyFan(t *testing.T) {
+	p := newStub()
+	p.readOnly = true
+	c := newTestController(t, p, true)
+	if err := c.Set("f1", Settings{Mode: ModeManual, ManualPct: 40}); err == nil {
+		t.Error("Set on a read-only fan should fail")
+	}
+	// Stale settings from a previous driver must not trigger writes.
+	c.mu.Lock()
+	c.settings["f1"] = Settings{Mode: ModeManual, ManualPct: 40}
+	c.mu.Unlock()
+	c.tick()
+	if p.taken["f1"] {
+		t.Error("tick must never write a read-only PWM")
+	}
+	st := c.LiveState().Fans[0]
+	if st.Writable || st.Err == "" {
+		t.Errorf("state should flag read-only + error, got %+v", st)
 	}
 }
 

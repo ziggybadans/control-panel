@@ -265,7 +265,15 @@ function FanCard({
         )}
         <div className="row right small">
           {fan.failsafe && <span className="badge crit">failsafe 100%</span>}
-          {fan.err && !fan.failsafe && (
+          {!fan.writable && (
+            <span
+              className="badge neutral"
+              title="The kernel driver exposes this fan's PWM read-only — monitoring works, control does not."
+            >
+              read-only
+            </span>
+          )}
+          {fan.err && !fan.failsafe && fan.writable && (
             <span className="badge crit" title={fan.err}>
               error
             </span>
@@ -291,12 +299,33 @@ function FanCard({
               key={m}
               className={`choice ${draft.mode === m ? "selected" : ""}`}
               onClick={() => setDraft({ ...draft, mode: m })}
-              disabled={!control && m !== "auto"}
+              disabled={(!control || !fan.writable) && m !== "auto"}
             >
               {m}
             </button>
           ))}
         </div>
+
+        {!fan.writable && (
+          <div className="small muted">
+            The kernel driver exposes this fan's PWM read-only, so only
+            monitoring is possible.
+            {(fan.hwLabel ?? fan.label).startsWith("nct6687") && (
+              <>
+                {" "}
+                On NCT6687D boards the out-of-tree{" "}
+                <a
+                  href="https://github.com/Fred78290/nct6687d"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  nct6687d driver
+                </a>{" "}
+                enables full control.
+              </>
+            )}
+          </div>
+        )}
 
         {draft.mode === "manual" && (
           <div className="row" style={{ gap: 12 }}>
@@ -348,7 +377,9 @@ function FanCard({
         <div className="row">
           <button
             className="btn btn-sm btn-primary"
-            disabled={!dirty || busy || (!control && draft.mode !== "auto")}
+            disabled={
+              !dirty || busy || ((!control || !fan.writable) && draft.mode !== "auto")
+            }
             onClick={() => void apply()}
           >
             {busy ? <Spinner size={11} /> : <Icon name="check" size={12} />}

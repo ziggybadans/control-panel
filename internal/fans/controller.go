@@ -139,13 +139,17 @@ func (c *Controller) tick() {
 		if custom := c.names[f.ID]; custom != "" {
 			label = custom
 		}
-		st := State{ID: f.ID, Label: label, HWLabel: f.Label, RPM: -1, Mode: ModeAuto}
+		st := State{ID: f.ID, Label: label, HWLabel: f.Label, RPM: -1, Mode: ModeAuto, Writable: f.Writable}
 		set, ok := c.settings[f.ID]
 		if ok {
 			st.Mode = set.Mode
 		}
 
-		if c.control {
+		if !f.Writable && st.Mode != ModeAuto {
+			// Settings can predate a driver change; never hammer a
+			// read-only attribute with doomed writes.
+			st.Err = "the kernel driver exposes this fan read-only — monitoring only"
+		} else if c.control {
 			switch st.Mode {
 			case ModeManual:
 				st.TargetPct = set.ManualPct
@@ -219,18 +223,22 @@ func (c *Controller) ReleaseAll() {
 // Set validates and stores settings for one fan, persists them, and applies
 // them immediately.
 func (c *Controller) Set(id string, s Settings) error {
-	fanKnown := false
+	var fan *Fan
 	for _, f := range c.p.Fans() {
 		if f.ID == id {
-			fanKnown = true
+			fan = &f
 			break
 		}
 	}
-	if !fanKnown {
+	if fan == nil {
 		return fmt.Errorf("unknown fan %q", id)
 	}
 	if !c.control && s.Mode != ModeAuto {
 		return fmt.Errorf("fan control is disabled (set fans.control: true)")
+	}
+	if !fan.Writable && s.Mode != ModeAuto {
+		return fmt.Errorf("the kernel driver exposes this fan read-only (PWM writes are " +
+			"vendor-gated in some drivers, e.g. nct6683) — monitoring only")
 	}
 	sensorExists := func(sid string) bool {
 		for _, sn := range c.p.Sensors() {
