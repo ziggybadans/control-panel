@@ -4,7 +4,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api/client";
-import type { MCServer, PropEntry } from "../../api/types";
+import type { FilesResponse, MCServer, PropEntry } from "../../api/types";
 import { useJobs } from "../../state/live";
 import { Spinner, Toggle } from "../../ui/bits";
 import { useConfirm } from "../../ui/Confirm";
@@ -116,6 +116,7 @@ function JarSection({ id, server }: { id: string; server: MCServer }) {
         </button>
         <span className="small faint">applies on next start · a jar can also be uploaded in Files</span>
       </div>
+      <ExistingJarRow id={id} server={server} />
       {jarJob && (
         <div style={{ marginTop: 8 }}>
           <JobPanel
@@ -169,6 +170,80 @@ function EulaSection({ id }: { id: string }) {
         Review &amp; accept
       </button>
     </section>
+  );
+}
+
+/**
+ * Point the launch configuration at a jar that's already in the server
+ * directory — covers imported servers and modpack launchers the download
+ * flavors don't offer.
+ */
+function ExistingJarRow({ id, server }: { id: string; server: MCServer }) {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [choice, setChoice] = useState("");
+
+  const { data: rootFiles } = useQuery({
+    queryKey: ["mc-files", id, ""],
+    queryFn: () => api<FilesResponse>(`/api/minecraft/${id}/files?path=`),
+    staleTime: 30_000,
+  });
+  const jars = (rootFiles?.entries ?? [])
+    .filter((e) => !e.dir && e.name.endsWith(".jar"))
+    .map((e) => e.name);
+
+  if (jars.length === 0) return null;
+  const selected = choice || jars.find((j) => j !== server.jar) || jars[0];
+
+  async function useJar() {
+    const ok = await confirm({
+      title: `Switch ${id} to ${selected}`,
+      target: id,
+      body: (
+        <>
+          The launch configuration will point at{" "}
+          <span className="mono">{selected}</span> (already in the server
+          folder) instead of <span className="mono">{server.jar || "auto-detection"}</span>.
+          Nothing is downloaded or deleted; applies on next start.
+        </>
+      ),
+      confirmLabel: "Use this jar",
+    });
+    if (!ok) return;
+    try {
+      await api(`/api/minecraft/${id}/config`, {
+        method: "PUT",
+        body: { jar: selected },
+      });
+      toast("ok", `now using ${selected} (applies on next start)`);
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "switch failed");
+    }
+  }
+
+  return (
+    <div className="row wrap" style={{ gap: 8, marginTop: 8 }}>
+      <span className="small muted">or use an existing jar:</span>
+      <select
+        className="select mono"
+        value={selected}
+        onChange={(e) => setChoice(e.target.value)}
+      >
+        {jars.map((j) => (
+          <option key={j} value={j}>
+            {j}
+            {j === server.jar ? " (current)" : ""}
+          </option>
+        ))}
+      </select>
+      <button
+        className="btn btn-sm"
+        disabled={selected === server.jar}
+        onClick={useJar}
+      >
+        Use this jar
+      </button>
+    </div>
   );
 }
 

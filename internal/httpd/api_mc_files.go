@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 
@@ -226,6 +227,65 @@ func (s *Server) handleMCMap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, mcfiles.DetectMap(dir))
+}
+
+// POST /api/minecraft/import?id=&mem= (multipart: one zip) — stages the
+// upload in the data dir, then extraction + rescan run as a job.
+func (s *Server) handleMCImport(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if err := mc.CheckID(id); err != nil {
+		writeErr(w, http.StatusBadRequest, "%s", err)
+		return
+	}
+	mem := r.URL.Query().Get("mem")
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
+	mr, err := r.MultipartReader()
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "multipart upload expected: %s", err)
+		return
+	}
+	var tmpPath string
+	for {
+		part, err := mr.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "read upload: %s", err)
+			return
+		}
+		if part.FileName() == "" {
+			continue // not a file field
+		}
+		tmp, err := os.CreateTemp(s.Cfg.DataDir, "mc-import-*.zip")
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "stage upload: %s", err)
+			return
+		}
+		_, err = io.Copy(tmp, part)
+		tmp.Close()
+		if err != nil {
+			os.Remove(tmp.Name())
+			writeErr(w, http.StatusInternalServerError, "stage upload: %s", err)
+			return
+		}
+		tmpPath = tmp.Name()
+		break
+	}
+	if tmpPath == "" {
+		writeErr(w, http.StatusBadRequest, "no zip file in upload")
+		return
+	}
+
+	job, err := s.MC.ImportServer(id, mem, tmpPath)
+	_ = s.record(r, "mc.import", id, "", err)
+	if err != nil {
+		os.Remove(tmpPath)
+		writeErr(w, http.StatusUnprocessableEntity, "%s", err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, job)
 }
 
 // GET /api/minecraft/meta/versions?flavor=

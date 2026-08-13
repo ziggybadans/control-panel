@@ -107,6 +107,65 @@ func (m *mockService) Versions(ctx context.Context, flavor string) ([]string, er
 	return mockVersions, nil
 }
 
+// ImportServer pretends to extract the uploaded zip and registers a new
+// mock server with what it "found" inside.
+func (m *mockService) ImportServer(id, mem, zipPath string) (*jobs.View, error) {
+	if err := CheckID(id); err != nil {
+		return nil, err
+	}
+	m.mu.Lock()
+	_, exists := m.servers[id]
+	port := 25564
+	for _, s := range m.servers {
+		if s.info.Port > port {
+			port = s.info.Port
+		}
+	}
+	port++
+	m.mu.Unlock()
+	if exists {
+		return nil, fmt.Errorf("server %q already exists", id)
+	}
+
+	return m.runner.Start("mc.import", id, func(ctx context.Context, out func(string)) error {
+		defer os.Remove(zipPath)
+		out("extracting archive…")
+		for _, n := range []int{250, 500, 750, 1000} {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(600 * time.Millisecond):
+			}
+			out(fmt.Sprintf("%d entries extracted…", n))
+		}
+		out("moved contents of \"" + id + "\" up to the server directory")
+		if mem == "" {
+			mem = "4G"
+		}
+		sv := &mockServer{
+			info: ServerInfo{
+				ID: id, Name: id,
+				Dir:   "/srv/minecraft/" + id,
+				State: StateStopped, Version: "1.21.4",
+				Software: "Imported", Port: port,
+				MaxPlayers: 20, Mem: mem, Java: "java", Jar: "server.jar",
+				EulaAccepted:  true,
+				OnlinePlayers: []string{},
+			},
+			props:   defaultProps(id, port, "Imported server", false),
+			backups: []BackupInfo{},
+			ring:    newLogRing(2000),
+		}
+		m.mu.Lock()
+		m.servers[id] = sv
+		m.mu.Unlock()
+		m.publish()
+		out("detected server jar: server.jar")
+		out(fmt.Sprintf("imported %q — review its settings before starting", id))
+		return nil
+	})
+}
+
 func (m *mockService) CreateServer(spec CreateSpec) (*jobs.View, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err

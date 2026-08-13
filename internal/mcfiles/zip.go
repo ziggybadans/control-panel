@@ -135,7 +135,13 @@ func Unzip(ctx context.Context, root, rel string, out func(string)) error {
 	if _, err := os.Lstat(dest); err == nil {
 		return fmt.Errorf("already exists: %s — remove or rename it first", destRel)
 	}
+	return UnzipInto(ctx, src, dest, out)
+}
 
+// UnzipInto extracts the zip at src into dest (created if needed), with the
+// same path-escape and zip-bomb guards as Unzip. Used by the server-import
+// flow, where the archive arrives as an upload outside any root.
+func UnzipInto(ctx context.Context, src, dest string, out func(string)) error {
 	zr, err := zip.OpenReader(src)
 	if err != nil {
 		return fmt.Errorf("open archive: %w", err)
@@ -190,6 +196,6 @@ func Unzip(ctx context.Context, root, rel string, out func(string)) error {
 			out(fmt.Sprintf("%d entries extracted…", i+1))
 		}
 	}
-	out(fmt.Sprintf("extracted %d entries into %s", len(zr.File), destRel))
+	out(fmt.Sprintf("extracted %d entries into %s", len(zr.File), filepath.Base(dest)))
 	return nil
 }

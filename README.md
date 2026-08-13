@@ -56,7 +56,10 @@ systemd service; accessed from any browser on the LAN.
   whitelist), `server.properties` editor that preserves comments, JVM / memory
   configuration, tar.gz backups with restore, EULA handling, crash detection
   with optional auto-restart. Plus: one-click **server setup** (Paper / Purpur /
-  Fabric / Vanilla, official jars downloaded with streamed progress), a
+  Fabric / Vanilla, official jars downloaded with streamed progress — or
+  **import an existing server** from a zip, with guarded extraction and jar
+  auto-detection; any jar already in the folder can be selected as the server
+  jar), a
   **file manager** confined to each server's directory (browse, rename/move,
   upload with drag-drop, download, zip/unzip, delete), a **plugins/mods
   manager** with metadata read from the jars and enable/disable toggles,

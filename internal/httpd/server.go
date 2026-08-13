@@ -128,6 +128,7 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/minecraft", s.handleMCList)
 	m.HandleFunc("POST /api/minecraft/rescan", s.handleMCRescan)
 	m.HandleFunc("POST /api/minecraft/create", s.handleMCCreate)
+	m.HandleFunc("POST /api/minecraft/import", s.handleMCImport)
 	m.HandleFunc("GET /api/minecraft/meta/versions", s.handleMCVersions)
 	m.HandleFunc("GET /api/minecraft/{id}/files", s.handleMCFilesList)
 	m.HandleFunc("POST /api/minecraft/{id}/files/op", s.handleMCFilesOp)

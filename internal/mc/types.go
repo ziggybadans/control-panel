@@ -215,6 +215,9 @@ type Service interface {
 	// CreateServer provisions a new server directory and downloads the
 	// selected server jar (runs as a job).
 	CreateServer(spec CreateSpec) (*jobs.View, error)
+	// ImportServer creates a server from an uploaded zip already saved at
+	// zipPath (runs as a job; the zip is deleted afterwards).
+	ImportServer(id, mem, zipPath string) (*jobs.View, error)
 	// UpdateJar downloads a new server jar into an existing server and
 	// switches the launch configuration to it (runs as a job).
 	UpdateJar(id, flavor, version string) (*jobs.View, error)

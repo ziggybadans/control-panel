@@ -1,9 +1,10 @@
-// New-server setup: pick flavor + version (fetched live), memory, port,
-// MOTD, EULA — provisioning runs as a job with streamed download progress.
+// New-server setup: download official server software (flavor + version
+// fetched live) or import an existing server from a zip. Both run as jobs
+// with streamed progress.
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { api } from "../../api/client";
+import { api, apiUpload } from "../../api/client";
 import type { Job, MCCreateSpec } from "../../api/types";
 import { useJobs } from "../../state/live";
 import { Spinner, Toggle } from "../../ui/bits";
@@ -20,6 +21,7 @@ const FLAVORS = [
 export function SetupModal({ onClose }: { onClose: () => void }) {
   const toast = useToast();
   const jobs = useJobs();
+  const [mode, setMode] = useState<"create" | "import">("create");
   const [spec, setSpec] = useState<MCCreateSpec>({
     id: "",
     flavor: "paper",
@@ -29,6 +31,7 @@ export function SetupModal({ onClose }: { onClose: () => void }) {
     motd: "A Minecraft Server",
     acceptEula: false,
   });
+  const [zipFile, setZipFile] = useState<File | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -37,12 +40,16 @@ export function SetupModal({ onClose }: { onClose: () => void }) {
     queryFn: () =>
       api<{ versions: string[] }>(`/api/minecraft/meta/versions?flavor=${spec.flavor}`),
     staleTime: 3600_000,
+    enabled: mode === "create",
   });
 
   const createJob = jobId ? jobs.find((j) => j.id === jobId) : undefined;
   const version = spec.version || versions?.versions?.[0] || "";
   const idValid = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(spec.id);
-  const ready = idValid && version && spec.acceptEula && !submitting;
+  const ready =
+    !submitting &&
+    idValid &&
+    (mode === "create" ? Boolean(version) && spec.acceptEula : zipFile !== null);
 
   async function create() {
     setSubmitting(true);
@@ -55,6 +62,22 @@ export function SetupModal({ onClose }: { onClose: () => void }) {
       toast("ok", `provisioning ${spec.id}`);
     } catch (e) {
       toast("error", e instanceof Error ? e.message : "create failed");
+      setSubmitting(false);
+    }
+  }
+
+  async function importZip() {
+    if (!zipFile) return;
+    setSubmitting(true);
+    try {
+      const job = await apiUpload<Job>(
+        `/api/minecraft/import?id=${encodeURIComponent(spec.id)}&mem=${encodeURIComponent(spec.mem)}`,
+        [zipFile],
+      );
+      setJobId(job.id);
+      toast("ok", `importing ${spec.id}`);
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "import failed");
       setSubmitting(false);
     }
   }
@@ -79,6 +102,25 @@ export function SetupModal({ onClose }: { onClose: () => void }) {
             </>
           ) : (
             <>
+              <div className="choice-row" role="tablist" aria-label="setup mode">
+                <button
+                  role="tab"
+                  aria-selected={mode === "create"}
+                  className={`choice ${mode === "create" ? "selected" : ""}`}
+                  onClick={() => setMode("create")}
+                >
+                  Download new
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={mode === "import"}
+                  className={`choice ${mode === "import" ? "selected" : ""}`}
+                  onClick={() => setMode("import")}
+                >
+                  Import existing (zip)
+                </button>
+              </div>
+
               <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div className="field">
                   <span className="label">Server id (folder name)</span>
@@ -94,23 +136,61 @@ export function SetupModal({ onClose }: { onClose: () => void }) {
                     <span className="hint crit-text">letters, digits, - _ . only</span>
                   )}
                 </div>
-                <div className="field">
-                  <span className="label">Version</span>
-                  <select
-                    className="select mono"
-                    value={version}
-                    onChange={(e) => setSpec({ ...spec, version: e.target.value })}
-                  >
-                    {versionsLoading && <option>loading…</option>}
-                    {(versions?.versions ?? []).slice(0, 30).map((v) => (
-                      <option key={v} value={v}>
-                        {v}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {mode === "create" ? (
+                  <div className="field">
+                    <span className="label">Version</span>
+                    <select
+                      className="select mono"
+                      value={version}
+                      onChange={(e) => setSpec({ ...spec, version: e.target.value })}
+                    >
+                      {versionsLoading && <option>loading…</option>}
+                      {(versions?.versions ?? []).slice(0, 30).map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="field">
+                    <span className="label">Memory</span>
+                    <input
+                      className="input mono"
+                      value={spec.mem}
+                      onChange={(e) => setSpec({ ...spec, mem: e.target.value })}
+                      spellCheck={false}
+                    />
+                  </div>
+                )}
               </div>
 
+              {mode === "import" && (
+                <>
+                  <div className="field">
+                    <span className="label">Server archive (.zip)</span>
+                    <input
+                      className="input"
+                      type="file"
+                      accept=".zip"
+                      onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
+                    />
+                    <span className="hint">
+                      A zip of the server folder or its contents (a single
+                      top-level folder is flattened automatically). The server
+                      jar is auto-detected; if that fails, pick one afterwards
+                      under Settings → Server jar.
+                    </span>
+                  </div>
+                  <div className="small faint">
+                    Extraction is confined to the new server directory and
+                    size-capped. Existing world data, configs, and mods are kept
+                    exactly as archived — nothing is modified.
+                  </div>
+                </>
+              )}
+
+              {mode === "create" && (
               <div className="field">
                 <span className="label">Software</span>
                 <div className="choice-row wrap">
@@ -129,7 +209,9 @@ export function SetupModal({ onClose }: { onClose: () => void }) {
                   {FLAVORS.find((f) => f.id === spec.flavor)?.hint}
                 </span>
               </div>
+              )}
 
+              {mode === "create" && (
               <div className="grid" style={{ gridTemplateColumns: "1fr 1fr 2fr", gap: 12 }}>
                 <div className="field">
                   <span className="label">Memory</span>
@@ -158,7 +240,9 @@ export function SetupModal({ onClose }: { onClose: () => void }) {
                   />
                 </div>
               </div>
+              )}
 
+              {mode === "create" && (
               <div className="setting-row" style={{ borderBottom: "none", padding: 0 }}>
                 <div className="desc">
                   <div className="t">Accept the Minecraft EULA</div>
@@ -175,6 +259,7 @@ export function SetupModal({ onClose }: { onClose: () => void }) {
                   label="accept eula"
                 />
               </div>
+              )}
             </>
           )}
         </div>
@@ -183,8 +268,18 @@ export function SetupModal({ onClose }: { onClose: () => void }) {
             {createJob?.state === "done" ? "Close" : "Cancel"}
           </button>
           {!createJob && (
-            <button className="btn btn-primary" disabled={!ready} onClick={create}>
-              {submitting ? <Spinner size={13} /> : "Create server"}
+            <button
+              className="btn btn-primary"
+              disabled={!ready}
+              onClick={mode === "create" ? create : importZip}
+            >
+              {submitting ? (
+                <Spinner size={13} />
+              ) : mode === "create" ? (
+                "Create server"
+              ) : (
+                "Upload & import"
+              )}
             </button>
           )}
         </div>
