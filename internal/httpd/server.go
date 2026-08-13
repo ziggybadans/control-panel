@@ -101,6 +101,7 @@ func (s *Server) routes() {
 	// Fans.
 	m.HandleFunc("GET /api/fans", s.handleFans)
 	m.HandleFunc("PUT /api/fans/{id}", s.handleFanSet)
+	m.HandleFunc("PUT /api/fans/{id}/name", s.handleFanName)
 
 	// Terminal.
 	m.HandleFunc("GET /api/terminal", s.handleTerminal)

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -31,7 +32,8 @@ type Controller struct {
 
 	mu       sync.Mutex
 	settings map[string]Settings
-	engaged  map[string]bool // fans the panel currently drives
+	names    map[string]string // user labels, overriding hardware ones
+	engaged  map[string]bool   // fans the panel currently drives
 	state    []State
 	sensors  []Sensor
 }
@@ -49,6 +51,7 @@ type Snapshot struct {
 	Fans      []State             `json:"fans"`
 	Sensors   []Sensor            `json:"sensors"`
 	Settings  map[string]Settings `json:"settings"`
+	Names     map[string]string   `json:"names"`
 }
 
 func NewController(p Provider, pub Publisher, dataDir string, interval time.Duration, control bool) *Controller {
@@ -63,6 +66,7 @@ func NewController(p Provider, pub Publisher, dataDir string, interval time.Dura
 		control:  control,
 		poke:     make(chan struct{}, 1),
 		settings: map[string]Settings{},
+		names:    map[string]string{},
 		engaged:  map[string]bool{},
 	}
 	c.load()
@@ -131,7 +135,11 @@ func (c *Controller) tick() {
 	fansList := c.p.Fans()
 	states := make([]State, 0, len(fansList))
 	for _, f := range fansList {
-		st := State{ID: f.ID, Label: f.Label, RPM: -1, Mode: ModeAuto}
+		label := f.Label
+		if custom := c.names[f.ID]; custom != "" {
+			label = custom
+		}
+		st := State{ID: f.ID, Label: label, HWLabel: f.Label, RPM: -1, Mode: ModeAuto}
 		set, ok := c.settings[f.ID]
 		if ok {
 			st.Mode = set.Mode
@@ -256,6 +264,41 @@ func (c *Controller) Set(id string, s Settings) error {
 	return nil
 }
 
+// SetName stores a custom label for one fan (empty reverts to the hardware
+// label), persists it, and refreshes state.
+func (c *Controller) SetName(id, name string) error {
+	fanKnown := false
+	for _, f := range c.p.Fans() {
+		if f.ID == id {
+			fanKnown = true
+			break
+		}
+	}
+	if !fanKnown {
+		return fmt.Errorf("unknown fan %q", id)
+	}
+	name = strings.TrimSpace(name)
+	if len(name) > 40 {
+		return fmt.Errorf("name too long (max 40 characters)")
+	}
+	c.mu.Lock()
+	if name == "" {
+		delete(c.names, id)
+	} else {
+		c.names[id] = name
+	}
+	err := c.save()
+	c.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	select {
+	case c.poke <- struct{}{}:
+	default:
+	}
+	return nil
+}
+
 // LiveState returns the last published live payload (SSE initial state).
 func (c *Controller) LiveState() Live {
 	c.mu.Lock()
@@ -271,19 +314,25 @@ func (c *Controller) Snap() Snapshot {
 	for k, v := range c.settings {
 		settings[k] = v
 	}
+	names := make(map[string]string, len(c.names))
+	for k, v := range c.names {
+		names[k] = v
+	}
 	return Snapshot{
 		Supported: len(c.p.Fans()) > 0,
 		Control:   c.control,
 		Fans:      c.state,
 		Sensors:   c.sensors,
 		Settings:  settings,
+		Names:     names,
 	}
 }
 
 // --- persistence ------------------------------------------------------------
 
 type persisted struct {
-	Fans map[string]Settings `json:"fans"`
+	Fans  map[string]Settings `json:"fans"`
+	Names map[string]string   `json:"names,omitempty"`
 }
 
 func (c *Controller) load() {
@@ -299,11 +348,14 @@ func (c *Controller) load() {
 	if p.Fans != nil {
 		c.settings = p.Fans
 	}
+	if p.Names != nil {
+		c.names = p.Names
+	}
 }
 
 // save writes settings atomically. Caller holds c.mu.
 func (c *Controller) save() error {
-	b, err := json.MarshalIndent(persisted{Fans: c.settings}, "", "  ")
+	b, err := json.MarshalIndent(persisted{Fans: c.settings, Names: c.names}, "", "  ")
 	if err != nil {
 		return err
 	}

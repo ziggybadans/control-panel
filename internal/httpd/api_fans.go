@@ -33,3 +33,20 @@ func (s *Server) handleFanSet(w http.ResponseWriter, r *http.Request) {
 	err := s.Fans.Set(id, set)
 	s.actionResult(w, r, "fans.set", id, set.Mode, err)
 }
+
+// PUT /api/fans/{id}/name — cosmetic label; audited but no confirm tier.
+func (s *Server) handleFanName(w http.ResponseWriter, r *http.Request) {
+	if s.Fans == nil {
+		writeErr(w, http.StatusNotImplemented, "fan control unavailable")
+		return
+	}
+	id := r.PathValue("id")
+	var body struct {
+		Name string `json:"name"`
+	}
+	if !readJSON(w, r, &body, 4096) {
+		return
+	}
+	err := s.Fans.SetName(id, body.Name)
+	s.actionResult(w, r, "fans.name", id, body.Name, err)
+}

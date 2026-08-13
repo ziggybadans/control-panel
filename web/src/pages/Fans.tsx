@@ -63,6 +63,14 @@ export function FansPage() {
   const fans = data.fans ?? [];
   const liveFans = live.fans ?? [];
   const sensors = (live.sensors?.length ? live.sensors : data.sensors) ?? [];
+  const current = (f: FanState) => liveFans.find((x) => x.id === f.id) ?? f;
+  // Headers reporting 0 rpm while untouched are almost certainly empty;
+  // fold them away (they stay fully controllable inside the fold).
+  const unused = fans.filter((f) => {
+    const c = current(f);
+    return c.rpm === 0 && c.mode === "auto" && !c.err;
+  });
+  const active = fans.filter((f) => !unused.includes(f));
 
   return (
     <div className="page">
@@ -76,16 +84,35 @@ export function FansPage() {
         </div>
       )}
       <div className="fans-grid">
-        {fans.map((f) => (
+        {active.map((f) => (
           <FanCard
             key={f.id}
-            fan={liveFans.find((x) => x.id === f.id) ?? f}
+            fan={current(f)}
             saved={data.settings?.[f.id]}
             sensors={sensors}
             control={data.control}
           />
         ))}
       </div>
+      {unused.length > 0 && (
+        <details className="fans-unused">
+          <summary className="small muted">
+            {unused.length} unconnected header{unused.length > 1 ? "s" : ""} (0 rpm,
+            firmware control)
+          </summary>
+          <div className="fans-grid" style={{ marginTop: 10 }}>
+            {unused.map((f) => (
+              <FanCard
+                key={f.id}
+                fan={current(f)}
+                saved={data.settings?.[f.id]}
+                sensors={sensors}
+                control={data.control}
+              />
+            ))}
+          </div>
+        </details>
+      )}
       <div className="small faint">
         Fans stay under firmware control until a manual duty or curve is applied.
         If a curve's sensor becomes unreadable, the fan is driven to 100% as a
@@ -125,6 +152,8 @@ function FanCard({
   const qc = useQueryClient();
   const [draft, setDraft] = useState<FanSettings>(() => draftFrom(saved, sensors));
   const [busy, setBusy] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [nameValue, setNameValue] = useState("");
   // Re-sync the draft when the server copy changes (apply elsewhere/reload).
   const savedKey = JSON.stringify(saved ?? null);
   useEffect(() => {
@@ -181,11 +210,59 @@ function FanCard({
     }
   }
 
+  async function saveName() {
+    setRenaming(false);
+    try {
+      await api(`/api/fans/${encodeURIComponent(fan.id)}/name`, {
+        method: "PUT",
+        body: { name: nameValue.trim() },
+      });
+      toast("ok", nameValue.trim() ? `renamed to ${nameValue.trim()}` : "name cleared");
+      await qc.invalidateQueries({ queryKey: ["fans"] });
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "rename failed");
+    }
+  }
+
   return (
     <div className="card">
       <div className="card-h">
         <Icon name="fan" size={14} className="faint" />
-        <span className="label">{fan.label}</span>
+        {renaming ? (
+          <input
+            className="input"
+            style={{ height: 22, fontSize: 12, maxWidth: 180 }}
+            value={nameValue}
+            placeholder={fan.hwLabel ?? fan.label}
+            autoFocus
+            maxLength={40}
+            onChange={(e) => setNameValue(e.target.value)}
+            onBlur={() => void saveName()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void saveName();
+              if (e.key === "Escape") setRenaming(false);
+            }}
+          />
+        ) : (
+          <>
+            <span
+              className="label"
+              title={fan.hwLabel && fan.hwLabel !== fan.label ? fan.hwLabel : undefined}
+            >
+              {fan.label}
+            </span>
+            <button
+              className="btn btn-ghost btn-sm btn-icon"
+              title="Rename fan (empty restores the hardware label)"
+              onClick={() => {
+                setNameValue(fan.hwLabel !== fan.label ? fan.label : "");
+                setRenaming(true);
+              }}
+            >
+              <Icon name="edit" size={11} />
+            </button>
+          </>
+        )}
         <div className="row right small">
           {fan.failsafe && <span className="badge crit">failsafe 100%</span>}
           {fan.err && !fan.failsafe && (

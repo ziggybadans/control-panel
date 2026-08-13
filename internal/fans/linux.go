@@ -95,14 +95,33 @@ func (p *hwmonProvider) scan() {
 			}
 			if m := tempRe.FindStringSubmatch(e.Name()); m != nil {
 				idx := m[1]
+				tempChip, chipLabel := chip, chip
+				// drivetemp chips are one-per-disk with identical names;
+				// key and label them by the disk instead ("sda · ST4000…").
+				// Note: an ID built on the block name changes if the kernel
+				// re-enumerates disks — a curve bound to it then fails safe
+				// (fan to 100%) rather than following the wrong drive.
+				if strings.HasPrefix(chip, "drivetemp") {
+					if block := blockDevName(dir); block != "" {
+						tempChip = "drivetemp-" + block
+						chipLabel = block
+						if model := readTrimmed(filepath.Join(dir, "device", "model")); model != "" {
+							chipLabel = block + " · " + model
+						}
+					}
+				}
 				label := readTrimmed(filepath.Join(dir, "temp"+idx+"_label"))
 				if label == "" {
-					label = chip + " temp" + idx
+					if tempChip != chip {
+						label = chipLabel // disk sensors: the disk is the label
+					} else {
+						label = chipLabel + " temp" + idx
+					}
 				} else {
-					label = chip + " " + label
+					label = chipLabel + " " + label
 				}
 				p.temps = append(p.temps, hwmonTemp{
-					id:    chip + ":temp" + idx,
+					id:    tempChip + ":temp" + idx,
 					label: label,
 					path:  filepath.Join(dir, e.Name()),
 				})
@@ -238,4 +257,14 @@ func pathExists(path string) bool {
 func hwmonNum(dir string) int {
 	n, _ := strconv.Atoi(strings.TrimPrefix(filepath.Base(dir), "hwmon"))
 	return n
+}
+
+// blockDevName returns the block device (e.g. "sda") behind a hwmon chip,
+// or "" when there is none.
+func blockDevName(hwmonDir string) string {
+	entries, err := os.ReadDir(filepath.Join(hwmonDir, "device", "block"))
+	if err != nil || len(entries) == 0 {
+		return ""
+	}
+	return entries[0].Name()
 }

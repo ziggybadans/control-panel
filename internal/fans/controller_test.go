@@ -2,6 +2,7 @@ package fans
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -87,14 +88,14 @@ func TestSettingsValidate(t *testing.T) {
 		{Mode: "chaos"},
 		{Mode: ModeManual, ManualPct: 101},
 		{Mode: ModeManual, ManualPct: -1},
-		{Mode: ModeCurve, Sensor: "cpu", Points: []CurvePoint{{TempC: 30, DutyPct: 20}}},            // 1 point
-		{Mode: ModeCurve, Sensor: "gone", Points: []CurvePoint{{30, 20}, {50, 40}}},                 // unknown sensor
-		{Mode: ModeCurve, Sensor: "cpu", Points: []CurvePoint{{50, 20}, {30, 40}}},                  // unsorted
-		{Mode: ModeCurve, Sensor: "cpu", Points: []CurvePoint{{30, 20}, {30, 40}}},                  // duplicate temp
-		{Mode: ModeCurve, Sensor: "cpu", Points: []CurvePoint{{30, 20}, {200, 40}}},                 // temp range
-		{Mode: ModeCurve, Sensor: "cpu", Points: []CurvePoint{{30, 120}, {50, 40}}},                 // duty range
-		{Mode: ModeCurve, Sensor: "cpu"},                                                            // no points
-		{Mode: ModeCurve, Points: []CurvePoint{{30, 20}, {50, 40}}},                                 // no sensor
+		{Mode: ModeCurve, Sensor: "cpu", Points: []CurvePoint{{TempC: 30, DutyPct: 20}}}, // 1 point
+		{Mode: ModeCurve, Sensor: "gone", Points: []CurvePoint{{30, 20}, {50, 40}}},      // unknown sensor
+		{Mode: ModeCurve, Sensor: "cpu", Points: []CurvePoint{{50, 20}, {30, 40}}},       // unsorted
+		{Mode: ModeCurve, Sensor: "cpu", Points: []CurvePoint{{30, 20}, {30, 40}}},       // duplicate temp
+		{Mode: ModeCurve, Sensor: "cpu", Points: []CurvePoint{{30, 20}, {200, 40}}},      // temp range
+		{Mode: ModeCurve, Sensor: "cpu", Points: []CurvePoint{{30, 120}, {50, 40}}},      // duty range
+		{Mode: ModeCurve, Sensor: "cpu"},                                                 // no points
+		{Mode: ModeCurve, Points: []CurvePoint{{30, 20}, {50, 40}}},                      // no sensor
 	}
 	for i, s := range bad {
 		if err := s.Validate(exists); err == nil {
@@ -203,6 +204,41 @@ func TestSettingsPersistence(t *testing.T) {
 	got, ok := c2.Snap().Settings["f1"]
 	if !ok || got.Mode != want.Mode || got.ManualPct != want.ManualPct {
 		t.Errorf("reloaded settings = %+v (ok=%v), want %+v", got, ok, want)
+	}
+}
+
+func TestFanNames(t *testing.T) {
+	p := newStub()
+	dir := t.TempDir()
+	c := NewController(p, nopPub{}, dir, time.Second, true)
+	if err := c.SetName("f1", "  Front intake  "); err != nil {
+		t.Fatalf("SetName: %v", err)
+	}
+	c.tick()
+	st := c.LiveState().Fans[0]
+	if st.Label != "Front intake" || st.HWLabel != "Fan 1" {
+		t.Errorf("label = %q hw = %q, want custom trimmed + hw preserved", st.Label, st.HWLabel)
+	}
+
+	// Names survive a reload.
+	c2 := NewController(newStub(), nopPub{}, dir, time.Second, true)
+	if got := c2.Snap().Names["f1"]; got != "Front intake" {
+		t.Errorf("reloaded name = %q", got)
+	}
+
+	// Empty reverts to hardware label; unknown fans and silly lengths fail.
+	if err := c.SetName("f1", ""); err != nil {
+		t.Fatalf("clear name: %v", err)
+	}
+	c.tick()
+	if got := c.LiveState().Fans[0].Label; got != "Fan 1" {
+		t.Errorf("cleared label = %q, want hardware label", got)
+	}
+	if err := c.SetName("nope", "x"); err == nil {
+		t.Error("unknown fan should fail")
+	}
+	if err := c.SetName("f1", strings.Repeat("x", 41)); err == nil {
+		t.Error("over-long name should fail")
 	}
 }
 

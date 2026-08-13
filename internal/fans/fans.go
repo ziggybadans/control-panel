@@ -25,8 +25,10 @@ type Fan struct {
 
 // State is the live view of one fan, published on the SSE stream.
 type State struct {
-	ID      string  `json:"id"`
-	Label   string  `json:"label"`
+	ID    string `json:"id"`
+	Label string `json:"label"` // custom name when set, else hardware label
+	// HWLabel is the hardware label (rename placeholder in the UI).
+	HWLabel string  `json:"hwLabel,omitempty"`
 	RPM     int     `json:"rpm"` // -1 when the fan has no tach
 	DutyPct float64 `json:"dutyPct"`
 	Mode    string  `json:"mode"` // auto | manual | curve

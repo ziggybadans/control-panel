@@ -87,7 +87,10 @@ function prettyTempLabel(label: string): string {
 
 export function FansWidget() {
   const { fans } = useFansLive();
-  const list = fans ?? [];
+  // Hide untouched 0-rpm headers (they're folded on the Fans page too).
+  const list = (fans ?? []).filter(
+    (f) => !(f.rpm === 0 && f.mode === "auto" && !f.err),
+  );
   if (list.length === 0) {
     return <div className="small faint">No controllable fans detected.</div>;
   }

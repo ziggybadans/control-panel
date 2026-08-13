@@ -79,7 +79,8 @@ export interface Snapshot {
 
 export interface FanState {
   id: string;
-  label: string;
+  label: string; // custom name when set, else hardware label
+  hwLabel?: string;
   rpm: number; // -1 = no tach
   dutyPct: number;
   mode: "auto" | "manual" | "curve";
@@ -118,6 +119,7 @@ export interface FansSnapshot {
   fans: FanState[] | null;
   sensors: FanSensor[] | null;
   settings: Record<string, FanSettings> | null;
+  names: Record<string, string> | null;
 }
 
 // Storage

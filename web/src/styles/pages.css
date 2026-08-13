@@ -377,3 +377,8 @@
 .term-container .xterm {
   height: 100%;
 }
+
+.fans-unused > summary {
+  cursor: pointer;
+  user-select: none;
+}
