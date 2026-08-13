@@ -4,7 +4,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
-import type { AppsResponse, PlexStatus, StorageOverview } from "../../api/types";
+import type { AppsResponse, PlexStatus, Smart, StorageOverview } from "../../api/types";
 import { fmtBytes, fmtPct, fmtTemp } from "../../lib/format";
 import { useLatestMetrics, useMCServers, useServices } from "../../state/live";
 import { useSystem } from "../../state/system";
@@ -91,12 +91,17 @@ export function StorageWidget() {
     queryFn: () => api<StorageOverview>("/api/storage"),
     refetchInterval: 30_000,
   });
+  const m = useLatestMetrics();
   const pools = data?.pools ?? [];
   const disks = data?.disks ?? [];
-  const unhealthy = disks.filter((d) => d.smart.healthy === false).length;
-  const flagged = disks.filter(
-    (d) => (d.smart.reallocated ?? 0) > 0 || (d.smart.pendingSectors ?? 0) > 0,
-  ).length;
+  // Pool branches carry per-disk usage; index them by underlying device.
+  const branchByDev = new Map(
+    pools.flatMap((p) => p.branches ?? []).map((b) => [b.device, b]),
+  );
+  const liveTemp = (name: string): number | undefined => {
+    const t = m?.temps.find((t) => t.label === `drivetemp ${name}`);
+    return t?.c;
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -110,30 +115,68 @@ export function StorageWidget() {
             </span>
           </div>
           <CapacityBar used={p.used} total={p.total} thick />
-          <div className="row small faint" style={{ marginTop: 4 }}>
-            <span>
-              {(p.branches ?? []).length} branches · {p.fsType}
-            </span>
-          </div>
         </div>
       ))}
-      <div className="row small">
-        <span className="muted">{disks.length} disks</span>
-        {unhealthy > 0 ? (
-          <span className="badge crit right">
-            {unhealthy} SMART failure{unhealthy > 1 ? "s" : ""}
-          </span>
-        ) : flagged > 0 ? (
-          <span className="badge warn right">{flagged} flagged</span>
-        ) : (
-          <span className="badge ok right">all healthy</span>
-        )}
+      <div className="mini-rows">
+        {disks.map((d) => {
+          const br = branchByDev.get(d.name);
+          const temp = liveTemp(d.name) ?? d.tempC;
+          return (
+            <div key={d.name} className="mini-row" title={d.model}>
+              <DiskHealthDot smart={d.smart} />
+              <span className="mono small" style={{ minWidth: 62 }}>
+                {d.name}
+              </span>
+              {br ? (
+                <span style={{ flex: "1 1 56px", minWidth: 40 }}>
+                  <CapacityBar used={br.used} total={br.total} />
+                </span>
+              ) : (
+                <span className="small faint truncate" style={{ flex: "1 1 56px", minWidth: 0 }}>
+                  {d.rotational ? "hdd" : "ssd"}
+                </span>
+              )}
+              <span className="right row" style={{ gap: 10, flex: "none" }}>
+                {temp !== undefined && (
+                  <span
+                    className={`small num ${tempLevel(d.rotational ? `drivetemp ${d.name}` : "nvme", temp)}`}
+                  >
+                    {fmtTemp(temp)}
+                  </span>
+                )}
+                <span className="small muted num" style={{ minWidth: 52, textAlign: "right" }}>
+                  {br ? fmtBytes(br.used, 1) : fmtBytes(d.sizeBytes, 0)}
+                </span>
+              </span>
+            </div>
+          );
+        })}
+        {disks.length === 0 && <div className="small faint">No disks detected.</div>}
       </div>
       <Link to="/storage" className="small">
         Storage details →
       </Link>
     </div>
   );
+}
+
+/** SMART status as a compact dot: green ok, amber flagged, red failing. */
+function DiskHealthDot({ smart }: { smart: Smart }) {
+  if (smart.healthy === false) {
+    return <span className="dot crit" title="SMART: failing" />;
+  }
+  if ((smart.reallocated ?? 0) > 0 || (smart.pendingSectors ?? 0) > 0) {
+    return (
+      <span
+        className="dot warn"
+        title={`SMART: ${smart.reallocated ?? 0} reallocated · ${smart.pendingSectors ?? 0} pending`}
+      />
+    );
+  }
+  if (!smart.available) {
+    return <span className="dot off" title="SMART unavailable" />;
+  }
+  return <span className="dot ok" title="SMART: healthy" />;
 }
 
 // --- Services ---------------------------------------------------------------
