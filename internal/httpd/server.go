@@ -22,6 +22,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/metrics"
 	"github.com/ziggybadans/control-panel/internal/plex"
 	"github.com/ziggybadans/control-panel/internal/prefs"
+	"github.com/ziggybadans/control-panel/internal/qbit"
 	"github.com/ziggybadans/control-panel/internal/sched"
 	"github.com/ziggybadans/control-panel/internal/services"
 	"github.com/ziggybadans/control-panel/internal/storage"
@@ -44,6 +45,7 @@ type Deps struct {
 	Services services.Provider
 	Plex     plex.Provider
 	Apps     apps.Provider
+	Qbit     qbit.Provider
 	MC       mc.Service
 	Update   update.Provider
 	Fans     *fans.Controller
@@ -70,6 +72,11 @@ func New(d Deps) *Server {
 		mux:            http.NewServeMux(),
 		trustedProxies: d.Cfg.TrustedProxyNets(),
 		loginSem:       make(chan struct{}, 2),
+	}
+	if s.Qbit == nil {
+		// A client with no URL reports itself unconfigured, which is what
+		// every qBittorrent handler checks for.
+		s.Qbit = qbit.NewClient("", "", "", false)
 	}
 	s.routes()
 	return s
@@ -125,6 +132,11 @@ func (s *Server) routes() {
 
 	// Media apps (*arr suite, Overseerr/Jellyseerr).
 	m.HandleFunc("GET /api/apps", s.handleApps)
+
+	// qBittorrent.
+	m.HandleFunc("GET /api/qbit", s.handleQbit)
+	m.HandleFunc("GET /api/qbit/torrents/{hash}/files", s.handleQbitFiles)
+	m.HandleFunc("POST /api/qbit/{op}", s.handleQbitAction)
 
 	// Minecraft.
 	m.HandleFunc("GET /api/minecraft", s.handleMCList)

@@ -93,6 +93,22 @@ apps: []
 #    url: http://127.0.0.1:5055
 #    api_key: "…"
 
+# qBittorrent (qBittorrent page + the dashboard's download list). The panel
+# talks to the WebUI API with these credentials and exposes only its own
+# allowlisted actions — pause/resume, queue priority, sequential download,
+# recheck, delete, and the global speed limits. Deleting is confirm-gated
+# and every action is audited. Empty url disables the page.
+qbittorrent:
+  url: ""
+  #  url: http://127.0.0.1:8085
+  # Leave the username empty if the instance bypasses authentication for the
+  # panel's address (qBittorrent: "Bypass authentication for clients on
+  # localhost"). Credentials never leave the server.
+  username: ""
+  password: ""
+  # Set false to make the page read-only.
+  allow_actions: true
+
 minecraft:
   # Every subdirectory containing a server jar / run.sh becomes a managed
   # server; the directory name is its id.

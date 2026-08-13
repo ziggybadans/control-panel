@@ -34,6 +34,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/metrics"
 	"github.com/ziggybadans/control-panel/internal/plex"
 	"github.com/ziggybadans/control-panel/internal/prefs"
+	"github.com/ziggybadans/control-panel/internal/qbit"
 	"github.com/ziggybadans/control-panel/internal/sched"
 	"github.com/ziggybadans/control-panel/internal/services"
 	"github.com/ziggybadans/control-panel/internal/storage"
@@ -122,6 +123,7 @@ func main() {
 		serviceProv services.Provider
 		plexProv    plex.Provider
 		appsProv    apps.Provider
+		qbitProv    qbit.Provider
 		mcService   mc.Service
 		mcManager   *mc.Manager
 		updateProv  update.Provider
@@ -134,6 +136,7 @@ func main() {
 		serviceProv = services.NewMockProvider()
 		plexProv = plex.NewMockProvider()
 		appsProv = apps.NewMockProvider()
+		qbitProv = qbit.NewMockProvider()
 		mcService = mc.NewMockService(bus, runner, cfg.DataDir)
 		updateProv = update.NewMockProvider(version)
 		fansProv = fans.NewMockProvider()
@@ -147,6 +150,8 @@ func main() {
 		serviceProv = newSystemdProvider(cfg.Services.Units)
 		plexProv = plex.NewClient(cfg.Plex.URL, cfg.Plex.Token)
 		appsProv = apps.NewClient(cfg.Apps)
+		qbitProv = qbit.NewClient(cfg.QBittorrent.URL, cfg.QBittorrent.Username,
+			cfg.QBittorrent.Password, cfg.QBitActions())
 		mcManager = mc.NewManager(cfg.Minecraft, cfg.DataDir, bus, runner)
 		mcService = mcManager
 		updateProv = update.NewClient(cfg.Update.Repo, cfg.Update.Token, version)
@@ -270,6 +275,7 @@ func main() {
 		Services: serviceProv,
 		Plex:     plexProv,
 		Apps:     appsProv,
+		Qbit:     qbitProv,
 		MC:       mcService,
 		Update:   updateProv,
 		Fans:     fansCtl,

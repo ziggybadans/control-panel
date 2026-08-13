@@ -25,14 +25,15 @@ type Config struct {
 	// is reached directly and X-Forwarded-For is ignored.
 	TrustedProxies []string `yaml:"trusted_proxies"`
 
-	Auth      Auth      `yaml:"auth"`
-	TLS       TLS       `yaml:"tls"`
-	Metrics   Metrics   `yaml:"metrics"`
-	Storage   Storage   `yaml:"storage"`
-	Services  Services  `yaml:"services"`
-	Plex      Plex      `yaml:"plex"`
-	Apps      []App     `yaml:"apps"`
-	Minecraft Minecraft `yaml:"minecraft"`
+	Auth        Auth        `yaml:"auth"`
+	TLS         TLS         `yaml:"tls"`
+	Metrics     Metrics     `yaml:"metrics"`
+	Storage     Storage     `yaml:"storage"`
+	Services    Services    `yaml:"services"`
+	Plex        Plex        `yaml:"plex"`
+	Apps        []App       `yaml:"apps"`
+	QBittorrent QBittorrent `yaml:"qbittorrent"`
+	Minecraft   Minecraft   `yaml:"minecraft"`
 	Power     Power     `yaml:"power"`
 	Update    Update    `yaml:"update"`
 	Fans      Fans      `yaml:"fans"`
@@ -154,6 +155,20 @@ type Services struct {
 type Plex struct {
 	URL   string `yaml:"url"`
 	Token string `yaml:"token"`
+}
+
+// QBittorrent configures the download-client integration. An empty URL
+// disables the qBittorrent page.
+type QBittorrent struct {
+	URL string `yaml:"url"`
+	// Username/Password authenticate against the WebUI. Leave the username
+	// empty when the instance exempts the panel's address from
+	// authentication ("Bypass authentication for clients on localhost").
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	// AllowActions enables pause/resume/delete/priority and the global
+	// speed limits. When false the page is read-only. Default true.
+	AllowActions *bool `yaml:"allow_actions"`
 }
 
 type Minecraft struct {
@@ -340,6 +355,10 @@ func (c *Config) validate() error {
 			app.Name = strings.ToUpper(app.Type[:1]) + app.Type[1:]
 		}
 	}
+	if u := c.QBittorrent.URL; u != "" &&
+		!strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
+		return fmt.Errorf("qbittorrent.url must start with http:// or https://, got %q", u)
+	}
 	return nil
 }
 
@@ -403,4 +422,10 @@ func (c *Config) ResumeMC() bool {
 // FanControl reports whether fan PWM writes are enabled (default true).
 func (c *Config) FanControl() bool {
 	return c.Fans.Control == nil || *c.Fans.Control
+}
+
+// QBitActions reports whether qBittorrent actions are enabled (default
+// true; irrelevant when no URL is configured).
+func (c *Config) QBitActions() bool {
+	return c.QBittorrent.AllowActions == nil || *c.QBittorrent.AllowActions
 }

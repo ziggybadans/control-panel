@@ -16,6 +16,7 @@ systemd service; accessed from any browser on the LAN.
                                  │  ├─ files      confined file roots   │
                                  │  ├─ services   systemd (allowlist)   │
                                  │  ├─ plex       Plex HTTP API         │
+                                 │  ├─ qbit       qBittorrent WebUI     │
                                  │  ├─ terminal   opt-in PTY (run_as)   │
                                  │  └─ minecraft  process supervision,  │
                                  │                console, RCON,        │
@@ -46,11 +47,22 @@ systemd service; accessed from any browser on the LAN.
 - **Services** — curated systemd units: state, uptime, memory, start / stop /
   restart, journal tail.
 - **Plex** — active sessions (with transcode indicator), library statistics,
-  service control.
+  service control. Its dashboard widget pairs what is playing with what is
+  downloading (see below).
 - **Media apps** — Radarr / Sonarr / Lidarr / Readarr / Prowlarr and
   Overseerr / Jellyseerr: download queues with live progress, health
   warnings, missing and upcoming counts, pending requests. Read-only —
   API keys never leave the server; one click opens each app's own UI.
+- **qBittorrent** — session state (rates, session totals, free space,
+  connection status, alternative speed limits) and the torrent list with
+  per-torrent details, files, and actions: pause/resume, queue priority,
+  sequential download and first/last-piece priority, recheck, and delete
+  (with or without data, confirm-gated). Torrents are matched to their
+  Radarr/Sonarr queue item by info hash, which gives each download the media
+  title and its runtime — and with the runtime, a **watchability verdict**:
+  whether the rest of the download will outrun playback (with a 10% cushion),
+  or how long to wait before starting. The same rows, with rate, ETA, and
+  verdict, appear under "now playing" in the Plex dashboard widget.
 - **Minecraft** — multiple servers, full lifecycle (start / stop / restart /
   kill), live console with command input, player management (kick / ban / op,
   whitelist), `server.properties` editor that preserves comments, JVM / memory
@@ -90,9 +102,15 @@ The panel is designed so it cannot damage the server it manages:
 - **Server-side confirmation.** Dangerous endpoints require an
   `X-Confirm: <target>` header echoing the exact target name; the UI enforces
   the same with typed-confirmation dialogs. Two tiers:
-  - *confirm* — service stop/restart, Minecraft stop/restart, fan settings
+  - *confirm* — service stop/restart, Minecraft stop/restart, fan settings,
+    torrent delete, pause/resume all torrents
   - *typed confirm* — force-kill, backup restore/delete, snapraid sync/scrub,
     folder delete, terminal session, reboot/shutdown
+- **Allowlisted integrations.** Plex, the *arr apps, and qBittorrent are
+  reached with credentials that stay server-side. The panel is never a
+  generic proxy: it exposes a fixed set of operations, validates identifiers
+  (e.g. torrent info hashes) before they reach the upstream API, and audits
+  every mutation.
 - **Fail-safe fan control.** Fans are only driven when explicitly switched to
   manual/curve; a curve whose sensor disappears drives its fan to 100%, and
   release (or panel shutdown) restores the exact firmware state.

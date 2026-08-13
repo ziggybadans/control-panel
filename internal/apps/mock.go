@@ -5,6 +5,8 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/ziggybadans/control-panel/internal/qbit"
 )
 
 // mockProvider simulates a typical media stack, with queue progress that
@@ -19,6 +21,22 @@ func NewMockProvider() Provider {
 }
 
 func (m *mockProvider) Configured() bool { return true }
+
+// Downloads keys the mock queue on the qbit mock's torrent hashes so the
+// media join is exercised end-to-end in mock mode.
+func (m *mockProvider) Downloads(ctx context.Context) map[string]Download {
+	return map[string]Download{
+		qbit.MockHashes.Dune: {
+			Title: "Dune: Part Two", Kind: "movie", App: "Radarr", RuntimeSec: 166 * 60,
+		},
+		qbit.MockHashes.Severance: {
+			Title: "Severance — S02E03", Kind: "episode", App: "Sonarr", RuntimeSec: 45 * 60,
+		},
+		qbit.MockHashes.WildRobot: {
+			Title: "The Wild Robot", Kind: "movie", App: "Radarr", RuntimeSec: 102 * 60,
+		},
+	}
+}
 
 func (m *mockProvider) List(ctx context.Context) []AppStatus {
 	m.mu.Lock()

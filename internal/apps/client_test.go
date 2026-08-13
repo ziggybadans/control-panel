@@ -32,7 +32,8 @@ func fakeRadarr(t *testing.T, apiKey string) *httptest.Server {
 	mux.HandleFunc("/api/v3/queue", auth(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"totalRecords":2,"records":[
 			{"title":"Some.Release.2160p.WEB-DL","status":"downloading","timeleft":"00:10:00",
-			 "size":1000,"sizeleft":250,"movie":{"title":"Dune: Part Two"}},
+			 "size":1000,"sizeleft":250,"downloadId":"ABCDEF0123456789ABCDEF0123456789ABCDEF01",
+			 "movie":{"title":"Dune: Part Two","runtime":166}},
 			{"title":"Other.Release","status":"queued","size":0,"sizeleft":0}
 		]}`))
 	}))
@@ -80,6 +81,32 @@ func TestClientFetchesRadarr(t *testing.T) {
 	}
 	if app.Missing != 7 || app.UpcomingWeek != 3 {
 		t.Errorf("missing=%d upcoming=%d", app.Missing, app.UpcomingWeek)
+	}
+}
+
+// The download index is what lets the panel tell a torrent which media it
+// will become — and how long that media plays for.
+func TestDownloadsIndexedByHash(t *testing.T) {
+	srv := fakeRadarr(t, "secret")
+	defer srv.Close()
+
+	c := NewClient([]config.App{{Name: "Radarr", Type: "radarr", URL: srv.URL, APIKey: "secret"}})
+	dl := c.Downloads(context.Background())
+	// Keys are lower-cased: qBittorrent reports hashes in lower case,
+	// the *arr apps in upper.
+	got, ok := dl["abcdef0123456789abcdef0123456789abcdef01"]
+	if !ok {
+		t.Fatalf("download not indexed: %v", dl)
+	}
+	if got.Title != "Dune: Part Two" || got.Kind != "movie" || got.App != "Radarr" {
+		t.Errorf("download = %+v", got)
+	}
+	if got.RuntimeSec != 166*60 {
+		t.Errorf("runtime = %ds, want %ds", got.RuntimeSec, 166*60)
+	}
+	// Records without a download id cannot be matched and must be skipped.
+	if len(dl) != 1 {
+		t.Errorf("indexed %d downloads, want 1", len(dl))
 	}
 }
 

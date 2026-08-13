@@ -39,6 +39,7 @@ type featureInfo struct {
 	Snapraid       bool   `json:"snapraid"`
 	Plex           bool   `json:"plex"`
 	Apps           int    `json:"apps"`
+	QBittorrent    bool   `json:"qbittorrent"`
 	MinecraftRoot  string `json:"minecraftRoot"`
 	MinecraftRunAs string `json:"minecraftRunAs,omitempty"`
 	Power          bool   `json:"power"`
@@ -67,6 +68,7 @@ func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
 				Snapraid:       s.Cfg.Storage.Snapraid.Config != "",
 				Plex:           s.Cfg.Plex.Token != "",
 				Apps:           len(s.Cfg.Apps),
+				QBittorrent:    s.Qbit.Configured(),
 				MinecraftRoot:  s.Cfg.Minecraft.Root,
 				MinecraftRunAs: s.Cfg.Minecraft.RunAs,
 				Power:          s.Cfg.Power.Allow,

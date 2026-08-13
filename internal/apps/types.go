@@ -41,9 +41,22 @@ type AppStatus struct {
 	Requests *RequestCounts `json:"requests,omitempty"`
 }
 
+// Download is one queued grab, keyed by the download client's own id (for
+// torrents, the info hash). It carries what the panel cannot learn from the
+// download client itself: which media this is, and how long it plays for.
+type Download struct {
+	Title      string `json:"title"`
+	Kind       string `json:"kind"` // movie | episode
+	App        string `json:"app"`  // Radarr | Sonarr | …
+	RuntimeSec int    `json:"runtimeSec"`
+}
+
 // Provider lists the status of every configured app.
 type Provider interface {
 	List(ctx context.Context) []AppStatus
 	// Configured reports whether any apps are set up (drives UI visibility).
 	Configured() bool
+	// Downloads indexes every queued item by lower-cased download id, so
+	// the panel can match a torrent to the media it will become.
+	Downloads(ctx context.Context) map[string]Download
 }

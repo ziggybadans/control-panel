@@ -8,6 +8,7 @@
   - `snapraid` — parity status / sync / scrub (set `storage.snapraid.config`)
   - a Java runtime (`apt install openjdk-21-jre-headless`) — Minecraft servers
   - Plex — set `plex.token` in the config
+  - qBittorrent — set `qbittorrent.url` (plus WebUI credentials) in the config
 
 ## Install
 

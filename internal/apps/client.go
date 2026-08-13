@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -14,17 +15,21 @@ import (
 )
 
 const (
-	cacheTTL     = 15 * time.Second
-	maxQueueRows = 5
+	cacheTTL = 15 * time.Second
+	// maxQueueRows caps what the UI renders; maxQueueFetch is how deep the
+	// queue is read, since every record feeds the download index.
+	maxQueueRows  = 5
+	maxQueueFetch = 100
 )
 
 type client struct {
 	apps []config.App
 	http *http.Client
 
-	mu     sync.Mutex
-	cached []AppStatus
-	at     time.Time
+	mu        sync.Mutex
+	cached    []AppStatus
+	downloads map[string]Download
+	at        time.Time
 }
 
 func NewClient(apps []config.App) Provider {
@@ -39,30 +44,48 @@ func (c *client) Configured() bool { return len(c.apps) > 0 }
 // List fetches all apps in parallel, memoized briefly so dashboard widget,
 // apps page, and menu bar polling share one round of upstream calls.
 func (c *client) List(ctx context.Context) []AppStatus {
+	out, _ := c.refresh(ctx)
+	return out
+}
+
+func (c *client) Downloads(ctx context.Context) map[string]Download {
+	_, dl := c.refresh(ctx)
+	return dl
+}
+
+func (c *client) refresh(ctx context.Context) ([]AppStatus, map[string]Download) {
 	c.mu.Lock()
 	if time.Since(c.at) < cacheTTL && c.cached != nil {
-		out := c.cached
+		out, dl := c.cached, c.downloads
 		c.mu.Unlock()
-		return out
+		return out, dl
 	}
 	c.mu.Unlock()
 
 	out := make([]AppStatus, len(c.apps))
+	downloads := make([]map[string]Download, len(c.apps))
 	var wg sync.WaitGroup
 	for i, app := range c.apps {
 		wg.Add(1)
 		go func(i int, app config.App) {
 			defer wg.Done()
-			out[i] = c.fetch(ctx, app)
+			out[i], downloads[i] = c.fetch(ctx, app)
 		}(i, app)
 	}
 	wg.Wait()
 
+	merged := map[string]Download{}
+	for _, m := range downloads {
+		for k, v := range m {
+			merged[k] = v
+		}
+	}
+
 	c.mu.Lock()
-	c.cached = out
+	c.cached, c.downloads = out, merged
 	c.at = time.Now()
 	c.mu.Unlock()
-	return out
+	return out, merged
 }
 
 // apiBase returns the API path prefix for a given app type.
@@ -91,7 +114,7 @@ func hasLibrary(appType string) bool {
 	return false
 }
 
-func (c *client) fetch(ctx context.Context, app config.App) AppStatus {
+func (c *client) fetch(ctx context.Context, app config.App) (AppStatus, map[string]Download) {
 	st := AppStatus{
 		Name:         app.Name,
 		Type:         app.Type,
@@ -101,10 +124,9 @@ func (c *client) fetch(ctx context.Context, app config.App) AppStatus {
 	}
 	if isSeerr(app.Type) {
 		c.fetchSeerr(ctx, app, &st)
-	} else {
-		c.fetchArr(ctx, app, &st)
+		return st, nil
 	}
-	return st
+	return st, c.fetchArr(ctx, app, &st)
 }
 
 // get performs one API request and decodes JSON into out.
@@ -141,7 +163,7 @@ func sanitizeErr(err error, key string) string {
 
 // --- *arr family ------------------------------------------------------------
 
-func (c *client) fetchArr(ctx context.Context, app config.App, st *AppStatus) {
+func (c *client) fetchArr(ctx context.Context, app config.App, st *AppStatus) map[string]Download {
 	base := apiBase(app.Type)
 
 	var status struct {
@@ -149,7 +171,7 @@ func (c *client) fetchArr(ctx context.Context, app config.App, st *AppStatus) {
 	}
 	if err := c.get(ctx, app, base+"/system/status", &status); err != nil {
 		st.Error = err.Error()
-		return
+		return nil
 	}
 	st.Reachable = true
 	st.Version = status.Version
@@ -165,38 +187,67 @@ func (c *client) fetchArr(ctx context.Context, app config.App, st *AppStatus) {
 	}
 
 	if !hasLibrary(app.Type) {
-		return
+		return nil
 	}
 
 	var queue struct {
 		TotalRecords int `json:"totalRecords"`
 		Records      []struct {
-			Title    string  `json:"title"`
-			Status   string  `json:"status"`
-			TimeLeft string  `json:"timeleft"`
-			Size     float64 `json:"size"`
-			SizeLeft float64 `json:"sizeleft"`
-			Series   *struct {
-				Title string `json:"title"`
+			Title      string  `json:"title"`
+			Status     string  `json:"status"`
+			TimeLeft   string  `json:"timeleft"`
+			Size       float64 `json:"size"`
+			SizeLeft   float64 `json:"sizeleft"`
+			DownloadID string  `json:"downloadId"`
+			Series     *struct {
+				Title   string `json:"title"`
+				Runtime int    `json:"runtime"` // minutes per episode
 			} `json:"series"`
 			Movie *struct {
-				Title string `json:"title"`
+				Title   string `json:"title"`
+				Runtime int    `json:"runtime"` // minutes
 			} `json:"movie"`
+			Episode *struct {
+				Title         string `json:"title"`
+				Runtime       int    `json:"runtime"`
+				SeasonNumber  int    `json:"seasonNumber"`
+				EpisodeNumber int    `json:"episodeNumber"`
+			} `json:"episode"`
 		} `json:"records"`
 	}
-	if err := c.get(ctx, app, base+"/queue?page=1&pageSize=10", &queue); err == nil {
+	// The include* parameters make recent *arr versions attach the media
+	// records (title and runtime); older ones ignore the extra keys.
+	queuePath := base + "/queue?page=1&pageSize=" + strconv.Itoa(maxQueueFetch) +
+		"&includeMovie=true&includeSeries=true&includeEpisode=true"
+	downloads := map[string]Download{}
+	if err := c.get(ctx, app, queuePath, &queue); err == nil {
 		st.QueueCount = queue.TotalRecords
 		for _, r := range queue.Records {
-			if len(st.Queue) >= maxQueueRows {
-				break
-			}
-			item := QueueItem{Title: r.Title, Status: r.Status, TimeLeft: r.TimeLeft}
+			title, kind, runtimeMin := r.Title, "", 0
 			// Prefer the media title over the raw release name when present.
-			if r.Series != nil && r.Series.Title != "" {
-				item.Title = r.Series.Title
-			} else if r.Movie != nil && r.Movie.Title != "" {
-				item.Title = r.Movie.Title
+			switch {
+			case r.Series != nil && r.Series.Title != "":
+				title, kind, runtimeMin = r.Series.Title, "episode", r.Series.Runtime
+				if r.Episode != nil {
+					title = fmt.Sprintf("%s — S%02dE%02d", title,
+						r.Episode.SeasonNumber, r.Episode.EpisodeNumber)
+					if r.Episode.Runtime > 0 {
+						runtimeMin = r.Episode.Runtime
+					}
+				}
+			case r.Movie != nil && r.Movie.Title != "":
+				title, kind, runtimeMin = r.Movie.Title, "movie", r.Movie.Runtime
 			}
+			if id := strings.ToLower(strings.TrimSpace(r.DownloadID)); id != "" {
+				downloads[id] = Download{
+					Title: title, Kind: kind, App: app.Name,
+					RuntimeSec: runtimeMin * 60,
+				}
+			}
+			if len(st.Queue) >= maxQueueRows {
+				continue
+			}
+			item := QueueItem{Title: title, Status: r.Status, TimeLeft: r.TimeLeft}
 			if r.Size > 0 {
 				item.Progress = (r.Size - r.SizeLeft) / r.Size * 100
 			}
@@ -222,6 +273,7 @@ func (c *client) fetchArr(ctx context.Context, app config.App, st *AppStatus) {
 	if err := c.get(ctx, app, base+"/calendar?"+q.Encode(), &calendar); err == nil {
 		st.UpcomingWeek = len(calendar)
 	}
+	return downloads
 }
 
 // --- Overseerr / Jellyseerr -------------------------------------------------

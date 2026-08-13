@@ -20,6 +20,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/metrics"
 	"github.com/ziggybadans/control-panel/internal/plex"
 	"github.com/ziggybadans/control-panel/internal/prefs"
+	"github.com/ziggybadans/control-panel/internal/qbit"
 	"github.com/ziggybadans/control-panel/internal/sched"
 	"github.com/ziggybadans/control-panel/internal/services"
 	"github.com/ziggybadans/control-panel/internal/storage"
@@ -221,6 +222,95 @@ func TestFilesSafety(t *testing.T) {
 	rec = doBody(h, "GET", "/api/files/list?root=nope", "", hdr)
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("unknown root: got %d, want 404", rec.Code)
+	}
+}
+
+func TestQbitActionSafety(t *testing.T) {
+	s := testServer(t, "none")
+	s.Qbit = qbit.NewMockProvider()
+	h := s.Handler()
+	hdr := map[string]string{"X-CP": "1"}
+	hash := qbit.MockHashes.Dune
+
+	// Anything outside the action allowlist is refused before it reaches
+	// the WebUI.
+	rec := doBody(h, "POST", "/api/qbit/setLocation",
+		`{"hashes":["`+hash+`"]}`, hdr)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("unlisted action: got %d, want 400", rec.Code)
+	}
+	// Hashes are validated, so no arbitrary form values reach qBittorrent.
+	rec = doBody(h, "POST", "/api/qbit/pause", `{"hashes":["../../etc"]}`, hdr)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("invalid hash: got %d, want 400", rec.Code)
+	}
+	// Deleting needs the confirmation header naming the torrent.
+	rec = doBody(h, "POST", "/api/qbit/delete", `{"hashes":["`+hash+`"]}`, hdr)
+	if rec.Code != http.StatusPreconditionRequired {
+		t.Errorf("delete without confirm: got %d, want 428", rec.Code)
+	}
+	rec = doBody(h, "POST", "/api/qbit/delete", `{"hashes":["`+hash+`"]}`,
+		map[string]string{"X-CP": "1", "X-Confirm": "wrong"})
+	if rec.Code != http.StatusPreconditionRequired {
+		t.Errorf("delete with wrong confirm: got %d, want 428", rec.Code)
+	}
+	// "all" is only ever a pause/resume wildcard, never a delete target.
+	rec = doBody(h, "POST", "/api/qbit/delete", `{"hashes":["all"]}`,
+		map[string]string{"X-CP": "1", "X-Confirm": "all"})
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("delete all: got %d, want 400", rec.Code)
+	}
+	// Bulk pause is confirm-gated too.
+	rec = doBody(h, "POST", "/api/qbit/pause", `{"hashes":["all"]}`, hdr)
+	if rec.Code != http.StatusPreconditionRequired {
+		t.Errorf("pause all without confirm: got %d, want 428", rec.Code)
+	}
+	rec = doBody(h, "POST", "/api/qbit/pause", `{"hashes":["`+hash+`"]}`, hdr)
+	if rec.Code != http.StatusOK {
+		t.Errorf("single pause: got %d %s", rec.Code, rec.Body.String())
+	}
+
+	// Read-only deployments refuse every action.
+	s.Cfg.QBittorrent.AllowActions = new(bool)
+	rec = doBody(s.Handler(), "POST", "/api/qbit/pause", `{"hashes":["`+hash+`"]}`, hdr)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("action with allow_actions=false: got %d, want 403", rec.Code)
+	}
+}
+
+func TestQbitUnconfiguredByDefault(t *testing.T) {
+	h := testServer(t, "none").Handler()
+	rec := do(h, "GET", "/api/qbit", map[string]string{"X-CP": "1"})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"configured":false`) {
+		t.Errorf("qbit status: got %d %s", rec.Code, rec.Body.String())
+	}
+	rec = doBody(h, "POST", "/api/qbit/pause", `{"hashes":["all"]}`, map[string]string{"X-CP": "1"})
+	if rec.Code != http.StatusNotImplemented {
+		t.Errorf("action while unconfigured: got %d, want 501", rec.Code)
+	}
+}
+
+// The watchability verdict needs the Radarr/Sonarr join; without a runtime
+// there is nothing to compare the ETA against.
+func TestQbitMediaJoin(t *testing.T) {
+	s := testServer(t, "none")
+	s.Qbit = qbit.NewMockProvider()
+	st := s.qbitStatus(context.Background())
+	var found bool
+	for _, tor := range st.Torrents {
+		if tor.Hash != qbit.MockHashes.Dune {
+			continue
+		}
+		found = true
+		if tor.Media == "" || tor.RuntimeSec == 0 {
+			t.Errorf("torrent not matched to its Radarr item: %+v", tor)
+		}
+		if tor.Watch.Verdict == "unknown" {
+			t.Errorf("verdict stayed unknown despite a runtime: %+v", tor.Watch)
+		}
+	}
+	if !found {
+		t.Fatal("mock torrent missing from the status")
 	}
 }
 
