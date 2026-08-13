@@ -47,6 +47,8 @@ mac-dmg: ## universal Panel Bar.app packaged as dist/PanelBar.dmg
 		macbar/.build/arm64-apple-macosx/release/PanelBar \
 		macbar/.build/x86_64-apple-macosx/release/PanelBar
 	cp macbar/Info.plist "dist/Panel Bar.app/Contents/Info.plist"
+	mkdir -p "dist/Panel Bar.app/Contents/Resources"
+	cp macbar/Resources/AppIcon.icns "dist/Panel Bar.app/Contents/Resources/AppIcon.icns"
 	codesign --force --sign - "dist/Panel Bar.app"
 	mkdir -p dist/dmg
 	cp -R "dist/Panel Bar.app" dist/dmg/
@@ -60,6 +62,8 @@ mac-bar: ## build the menu bar companion (dist/Panel Bar.app)
 	mkdir -p "dist/Panel Bar.app/Contents/MacOS"
 	cp macbar/.build/release/PanelBar "dist/Panel Bar.app/Contents/MacOS/PanelBar"
 	cp macbar/Info.plist "dist/Panel Bar.app/Contents/Info.plist"
+	mkdir -p "dist/Panel Bar.app/Contents/Resources"
+	cp macbar/Resources/AppIcon.icns "dist/Panel Bar.app/Contents/Resources/AppIcon.icns"
 	codesign --force --sign - "dist/Panel Bar.app"
 	@echo 'Built dist/Panel Bar.app — copy to /Applications and open it.'
 

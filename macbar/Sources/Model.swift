@@ -15,9 +15,15 @@ final class PanelModel: ObservableObject {
         case unconfigured
     }
 
+    struct PanelUpdate: Equatable {
+        var latestTag: String
+        var current: String
+    }
+
     @Published var summary: Summary?
     @Published var status: Status = .unconfigured
     @Published var showSettings = false
+    @Published var panelUpdate: PanelUpdate?
 
     // Settings (UserDefaults; password lives in the Keychain).
     @Published var urlString: String {
@@ -92,9 +98,39 @@ final class PanelModel: ObservableObject {
             let s = try JSONDecoder().decode(Summary.self, from: data)
             summary = s
             status = deriveStatus(s)
+            await checkPanelUpdate(base: base)
         } catch {
             status = .unreachable(shortError(error))
         }
+    }
+
+    // checkPanelUpdate surfaces the panel's own updater state (the server
+    // caches the GitHub query; this only asks half-hourly on top of that).
+    private var lastUpdateCheck: Date = .distantPast
+
+    private func checkPanelUpdate(base: URL) async {
+        guard Date().timeIntervalSince(lastUpdateCheck) > 1800 else { return }
+        lastUpdateCheck = Date()
+        struct UpdateStatus: Codable {
+            struct Release: Codable { var tag: String }
+            var updateAvailable: Bool
+            var current: String
+            var latest: Release?
+        }
+        guard let (data, code) = try? await get(base.appendingPathComponent("api/update")),
+              code == 200,
+              let st = try? JSONDecoder().decode(UpdateStatus.self, from: data)
+        else { return }
+        panelUpdate = st.updateAvailable
+            ? PanelUpdate(latestTag: st.latest?.tag ?? "", current: st.current)
+            : nil
+    }
+
+    /// Opens the panel's Settings page, where updates are installed.
+    func openPanelSettings() {
+        guard let base = baseURL,
+              let url = URL(string: base.absoluteString + "/#/settings") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     private func deriveStatus(_ s: Summary) -> Status {

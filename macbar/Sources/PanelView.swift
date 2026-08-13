@@ -138,6 +138,22 @@ struct PanelView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
+
+                if let up = model.panelUpdate {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.blue)
+                        Text("Panel \(up.latestTag) available")
+                            .font(.system(size: 12))
+                        Spacer()
+                        Button("Update…") { model.openPanelSettings() }
+                            .buttonStyle(.borderless)
+                            .controlSize(.small)
+                            .font(.system(size: 11))
+                    }
+                    .padding(.top, 3)
+                }
             }
             .padding(.horizontal, 12).padding(.vertical, 9)
         }
