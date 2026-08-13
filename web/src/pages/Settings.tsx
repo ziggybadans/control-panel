@@ -338,6 +338,12 @@ function AboutCard() {
         { label: `${f.apps} media app${f.apps === 1 ? "" : "s"}`, on: f.apps > 0 },
         { label: "power control", on: f.power },
         { label: "self-update", on: !!f.updateRepo },
+        { label: "fan control", on: f.fanControl },
+        {
+          label: f.fileRoots > 0 ? `${f.fileRoots} file root${f.fileRoots === 1 ? "" : "s"}` : "file manager",
+          on: f.fileRoots > 0,
+        },
+        { label: "terminal", on: f.terminal },
       ]
     : [];
 
@@ -493,7 +499,8 @@ function SafetyModal({ onClose }: { onClose: () => void }) {
                 <span className="badge crit">typed confirm</span>
                 <span className="muted">
                   force-kill · backup restore/delete · ban · snapraid sync/scrub ·
-                  folder delete · reboot/shutdown · panel updates
+                  folder delete · terminal session · reboot/shutdown · panel
+                  updates
                 </span>
               </div>
             </div>
@@ -516,7 +523,16 @@ function SafetyModal({ onClose }: { onClose: () => void }) {
               the units listed in config, snapraid runs only its four known
               subcommands, and Minecraft servers are supervised child processes
               (optionally de-privileged to <span className="mono">run_as</span>).
-              There is no general-purpose command endpoint.
+            </p>
+            <p className="muted">
+              The <b>Terminal</b> page is the one deliberate exception: it is a
+              real shell. It stays off unless{" "}
+              <span className="mono">terminal.enabled</span> is set, runs as the
+              unprivileged <span className="mono">terminal.run_as</span> user
+              (mandatory when the panel runs as root, unless root shells are
+              explicitly accepted), needs typed confirmation to open, caps
+              concurrent sessions, closes idle ones, and logs every session
+              open/close to the audit trail.
             </p>
           </div>
 

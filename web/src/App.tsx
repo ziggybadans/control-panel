@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { createHashRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, setUnauthorizedHandler } from "./api/client";
@@ -22,6 +22,9 @@ import { ActivityPage } from "./pages/Activity";
 import { SettingsPage } from "./pages/Settings";
 import { Spinner } from "./ui/bits";
 
+// Lazy: xterm.js is heavy and only needed by terminal users.
+const TerminalPage = lazy(() => import("./pages/Terminal"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 5000 },
@@ -42,6 +45,20 @@ const router = createHashRouter([
       { path: "/minecraft/:id", element: <MCServerPage /> },
       { path: "/plex", element: <PlexPage /> },
       { path: "/apps", element: <AppsPage /> },
+      {
+        path: "/terminal",
+        element: (
+          <Suspense
+            fallback={
+              <div className="page">
+                <Spinner />
+              </div>
+            }
+          >
+            <TerminalPage />
+          </Suspense>
+        ),
+      },
       { path: "/activity", element: <ActivityPage /> },
       { path: "/settings", element: <SettingsPage /> },
       { path: "*", element: <Dashboard /> },

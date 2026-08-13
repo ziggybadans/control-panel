@@ -23,6 +23,8 @@ export interface FeatureInfo {
   power: boolean;
   updateRepo?: string;
   fanControl: boolean;
+  fileRoots: number;
+  terminal: boolean;
 }
 
 export interface PanelInfo {
@@ -388,6 +390,21 @@ export interface FilesListResponse {
   root: string;
   path: string;
   entries: FileEntry[] | null;
+}
+
+// Terminal
+
+export interface TerminalSession {
+  id: string;
+  startedAt: number;
+  lastActive: number;
+}
+
+export interface TerminalStatus {
+  enabled: boolean;
+  description?: string;
+  maxSessions?: number;
+  sessions?: TerminalSession[] | null;
 }
 
 // Jobs / audit

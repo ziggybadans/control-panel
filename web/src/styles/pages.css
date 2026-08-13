@@ -355,3 +355,25 @@
   border: 2px solid var(--surface);
   cursor: pointer;
 }
+
+/* --- Terminal ---------------------------------------------------------------- */
+
+.term-page {
+  display: flex;
+  flex-direction: column;
+  /* Fill the viewport under the topbar so the shell gets real estate. */
+  height: calc(100vh - 150px);
+  min-height: 340px;
+}
+.term-container {
+  flex: 1;
+  min-height: 0;
+  background: var(--console-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 10px 4px 10px 12px;
+  overflow: hidden;
+}
+.term-container .xterm {
+  height: 100%;
+}
