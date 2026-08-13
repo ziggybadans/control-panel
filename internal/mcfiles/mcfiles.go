@@ -86,16 +86,14 @@ func List(root, rel string) ([]Entry, error) {
 	}
 	out := make([]Entry, 0, len(entries))
 	for _, e := range entries {
-		info, err := e.Info()
-		if err != nil {
-			continue
+		entry := Entry{Name: e.Name(), Dir: e.IsDir()}
+		// A failed stat (racing deletion, exotic fs) must not hide the
+		// entry — show it with zero metadata instead.
+		if info, err := e.Info(); err == nil {
+			entry.Size = info.Size()
+			entry.ModTime = info.ModTime().UnixMilli()
 		}
-		out = append(out, Entry{
-			Name:    e.Name(),
-			Dir:     e.IsDir(),
-			Size:    info.Size(),
-			ModTime: info.ModTime().UnixMilli(),
-		})
+		out = append(out, entry)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Dir != out[j].Dir {

@@ -1,8 +1,14 @@
 package mc
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
+	"hash/fnv"
+	"image"
+	"image/color"
+	"image/png"
 	"math/rand/v2"
 	"sort"
 	"strings"
@@ -93,8 +99,12 @@ func NewMockService(bus *events.Bus, runner *jobs.Runner, dataDir string) Servic
 		wl:      []NamedPlayer{{Name: "Draxx", UUID: "5f8a1c3e-1234-4a5b-8c7d-9e0f1a2b3c4d"}},
 	}
 
+	survival.info.MOTD = ParseLegacyMOTD("§2A cozy §asurvival §2world §7— §fwelcome home")
+	creative.info.MOTD = ParseLegacyMOTD("§bBuild §dwithout §blimits")
+	atm.info.MOTD = ParseLegacyMOTD("§6All the Mods §l10§r §7[§e1.21§7]")
 	for _, s := range []*mockServer{survival, creative, atm} {
 		s.ring = newLogRing(2000)
+		s.info.Icon = mockIcon(s.info.ID)
 		m.servers[s.info.ID] = s
 	}
 
@@ -105,6 +115,36 @@ func NewMockService(bus *events.Bus, runner *jobs.Runner, dataDir string) Servic
 	}()
 	go m.activityLoop()
 	return m
+}
+
+// mockIcon renders a deterministic 64x64 server icon (the real panel gets
+// these from the server-list ping).
+func mockIcon(seed string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(seed))
+	v := h.Sum32()
+	base := color.RGBA{R: uint8(64 + v%128), G: uint8(64 + (v>>8)%128), B: uint8(64 + (v>>16)%128), A: 255}
+	img := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	for y := 0; y < 64; y++ {
+		for x := 0; x < 64; x++ {
+			c := base
+			shade := uint8(y / 4)
+			c.R -= min(c.R, shade*2)
+			c.G -= min(c.G, shade*2)
+			c.B -= min(c.B, shade*2)
+			if (x+y)/8%2 == 0 {
+				c.R += 18
+				c.G += 18
+				c.B += 18
+			}
+			img.SetRGBA(x, y, c)
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return ""
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
 }
 
 func defaultProps(level string, port int, motd string, whitelist bool) []PropEntry {

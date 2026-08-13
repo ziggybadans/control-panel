@@ -446,3 +446,73 @@
   cursor: pointer;
   user-select: none;
 }
+
+/* --- Console view (shared read-only console) -------------------------------- */
+
+.console-view {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.console-view .console {
+  flex: 1;
+  min-height: 0;
+}
+.console-follow {
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+}
+
+/* --- Minecraft overview: vertical rows with console preview ----------------- */
+
+.mc-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.mc-row {
+  display: grid;
+  grid-template-columns: minmax(330px, 400px) 1fr;
+  gap: var(--gap);
+  align-items: stretch;
+}
+.mc-row .console-view {
+  min-height: 240px;
+}
+.mc-row .console-view .console {
+  border-radius: var(--r-card);
+  border: 1px solid var(--border);
+}
+@media (max-width: 1000px) {
+  .mc-row {
+    grid-template-columns: 1fr;
+  }
+  .mc-row .console-view {
+    min-height: 180px;
+    max-height: 240px;
+  }
+}
+
+/* Server-list-style MOTD chip (always console-dark, like the real list). */
+.mc-slp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--console-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  padding: 7px 10px;
+  min-height: 40px;
+}
+.mc-motd {
+  display: block;
+  color: #dddddd;
+  font-size: var(--fs);
+  line-height: 1.4;
+  white-space: pre-line;
+  min-width: 0;
+  overflow: hidden;
+}

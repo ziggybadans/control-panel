@@ -66,6 +66,8 @@ type instance struct {
 	memBytes      uint64
 	prevCPUTicks  uint64
 	prevCPUAt     time.Time
+	motd          []MOTDSegment // from the last server-list ping
+	icon          string
 
 	ring     *logRing
 	onChange func() // set by manager; called (unlocked) after state changes
@@ -109,6 +111,8 @@ func (in *instance) Info() ServerInfo {
 		RconEnabled:  in.rconEnabled,
 		LastExit:     in.lastExit,
 		EulaAccepted: in.eulaAcceptedLocked(),
+		MOTD:         in.motd,
+		Icon:         in.icon,
 	}
 	if !in.startedAt.IsZero() && (in.state == StateRunning || in.state == StateStarting || in.state == StateStopping) {
 		info.StartedAt = in.startedAt.UnixMilli()

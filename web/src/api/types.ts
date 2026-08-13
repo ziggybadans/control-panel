@@ -240,6 +240,16 @@ export interface PlexStatus {
 
 export type MCState = "stopped" | "starting" | "running" | "stopping" | "crashed";
 
+/** One styled run of MOTD text (from the server-list ping). */
+export interface MOTDSegment {
+  text: string;
+  color?: string; // minecraft color name or #rrggbb
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
+}
+
 export interface MCServer {
   id: string;
   name: string;
@@ -265,6 +275,8 @@ export interface MCServer {
   eulaAccepted: boolean;
   rconEnabled: boolean;
   lastExit?: string;
+  motd?: MOTDSegment[];
+  icon?: string; // data:image/png;base64,…
 }
 
 export interface LogLine {

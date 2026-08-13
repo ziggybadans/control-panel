@@ -50,6 +50,11 @@ type ServerInfo struct {
 	EulaAccepted bool   `json:"eulaAccepted"`
 	RconEnabled  bool   `json:"rconEnabled"`
 	LastExit     string `json:"lastExit,omitempty"`
+
+	// MOTD and Icon come from a server-list ping of the running server, so
+	// plugin-rewritten MOTDs (MiniMOTD etc.) show as players see them.
+	MOTD []MOTDSegment `json:"motd,omitempty"`
+	Icon string        `json:"icon,omitempty"` // data:image/png;base64,…
 }
 
 type LogLine struct {

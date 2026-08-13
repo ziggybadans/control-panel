@@ -25,7 +25,7 @@ export function FilesTab({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const jobs = useJobs();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["mc-files", id, path],
     queryFn: () =>
       api<FilesResponse>(
@@ -200,6 +200,12 @@ export function FilesTab({ id }: { id: string }) {
       >
         {isLoading ? (
           <Spinner />
+        ) : error ? (
+          // An unreadable folder must never masquerade as an empty one.
+          <div className="small crit-text">
+            Couldn't read this folder:{" "}
+            {error instanceof Error ? error.message : String(error)}
+          </div>
         ) : (
           <table className="table">
             <thead>

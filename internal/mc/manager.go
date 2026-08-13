@@ -46,6 +46,7 @@ func NewManager(cfg config.Minecraft, dataDir string, bus *events.Bus, runner *j
 		slog.Warn("minecraft discovery failed", "err", err)
 	}
 	go m.resourceLoop()
+	go m.pingLoop()
 	return m
 }
 

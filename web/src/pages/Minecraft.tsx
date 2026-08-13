@@ -1,5 +1,6 @@
-// Minecraft server list: one card per server with live vitals and quick
-// lifecycle actions.
+// Minecraft server list: one row per server — the card with live vitals and
+// quick lifecycle actions, and its live console alongside (read-only here;
+// commands are sent from the server's Console tab).
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -10,6 +11,8 @@ import { TopbarActions } from "../shell/Layout";
 import { Card, EmptyState, MCStateBadge } from "../ui/bits";
 import { Icon } from "../ui/Icon";
 import { useMCActions } from "./mc/actions";
+import { ConsoleView } from "./mc/ConsoleView";
+import { ServerListEntry } from "./mc/Motd";
 import { SetupModal } from "./mc/SetupModal";
 
 export function MinecraftPage() {
@@ -42,9 +45,18 @@ export function MinecraftPage() {
           />
         </Card>
       ) : (
-        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))" }}>
+        <div className="mc-rows">
           {servers.map((s) => (
-            <ServerCard key={s.id} server={s} />
+            <div key={s.id} className="mc-row">
+              <ServerCard server={s} />
+              <ConsoleView
+                id={s.id}
+                tail={100}
+                // Streams only for active servers so many stopped servers
+                // don't exhaust the browser's per-host connections.
+                live={s.state !== "stopped" && s.state !== "crashed"}
+              />
+            </div>
           ))}
         </div>
       )}
@@ -73,6 +85,7 @@ function ServerCard({ server: s }: { server: MCServer }) {
         </div>
       </div>
       <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <ServerListEntry icon={s.icon} motd={s.motd} />
         <dl className="kv">
           <dt>Players</dt>
           <dd className="num">
@@ -125,8 +138,7 @@ function ServerCard({ server: s }: { server: MCServer }) {
             </>
           )}
           <Link to={`/minecraft/${s.id}`} className="btn btn-sm btn-ghost right">
-            <Icon name="terminal" size={12} />
-            Console
+            Manage →
           </Link>
         </div>
       </div>
