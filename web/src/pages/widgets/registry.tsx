@@ -11,6 +11,7 @@ import {
   NetworkWidget,
 } from "./metrics";
 import {
+  FansWidget,
   MediaAppsWidget,
   MinecraftWidget,
   PlexWidget,
@@ -33,6 +34,7 @@ export const WIDGETS: Record<string, WidgetDef> = {
   diskio: { title: "Disk I/O", component: DiskIOWidget, headerExtra: DiskIOHeader },
   system: { title: "System", component: SystemWidget },
   temps: { title: "Temperatures", component: TempsWidget },
+  fans: { title: "Fans", component: FansWidget },
   storage: { title: "Storage", component: StorageWidget },
   minecraft: { title: "Minecraft", component: MinecraftWidget },
   services: { title: "Services", component: ServicesWidget },

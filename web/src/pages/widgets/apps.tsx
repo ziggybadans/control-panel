@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import type { AppsResponse, PlexStatus, Smart, StorageOverview } from "../../api/types";
 import { fmtBytes, fmtPct, fmtTemp } from "../../lib/format";
-import { useLatestMetrics, useMCServers, useServices } from "../../state/live";
+import { useFansLive, useLatestMetrics, useMCServers, useServices } from "../../state/live";
 import { useSystem } from "../../state/system";
 import { CapacityBar, MCStateBadge, ServiceBadge } from "../../ui/bits";
 import { Icon } from "../../ui/Icon";
@@ -81,6 +81,49 @@ function prettyTempLabel(label: string): string {
     .replace("coretemp Package id 0", "CPU package")
     .replace("nvme Composite", "NVMe")
     .replace("drivetemp ", "Drive ");
+}
+
+// --- Fans -------------------------------------------------------------------
+
+export function FansWidget() {
+  const { fans } = useFansLive();
+  const list = fans ?? [];
+  if (list.length === 0) {
+    return <div className="small faint">No controllable fans detected.</div>;
+  }
+  return (
+    <div className="mini-rows">
+      {list.map((f) => (
+        <Link
+          key={f.id}
+          to="/fans"
+          className="mini-row"
+          style={{ color: "inherit", textDecoration: "none" }}
+        >
+          <span className="truncate muted small" style={{ minWidth: 86 }}>
+            {f.label}
+          </span>
+          <span style={{ flex: "1 1 40px", minWidth: 32 }}>
+            <span className="bar">
+              <i style={{ width: `${Math.min(f.dutyPct, 100).toFixed(0)}%` }} />
+            </span>
+          </span>
+          <span className="right row" style={{ gap: 8, flex: "none" }}>
+            {f.failsafe && <span className="dot crit" title="failsafe: sensor unreadable" />}
+            {f.mode !== "auto" && (
+              <span className="small faint">{f.mode}</span>
+            )}
+            <span className="small num muted" style={{ minWidth: 34, textAlign: "right" }}>
+              {Math.round(f.dutyPct)}%
+            </span>
+            <span className="small num muted" style={{ minWidth: 62, textAlign: "right" }}>
+              {f.rpm >= 0 ? `${f.rpm} rpm` : "—"}
+            </span>
+          </span>
+        </Link>
+      ))}
+    </div>
+  );
 }
 
 // --- Storage ----------------------------------------------------------------

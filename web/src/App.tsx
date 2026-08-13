@@ -11,6 +11,7 @@ import { Layout } from "./shell/Layout";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import { StoragePage } from "./pages/Storage";
+import { FansPage } from "./pages/Fans";
 import { ServicesPage } from "./pages/Services";
 import { MinecraftPage } from "./pages/Minecraft";
 import { MCServerPage } from "./pages/McServer";
@@ -33,6 +34,7 @@ const router = createHashRouter([
     children: [
       { path: "/", element: <Dashboard /> },
       { path: "/storage", element: <StoragePage /> },
+      { path: "/fans", element: <FansPage /> },
       { path: "/services", element: <ServicesPage /> },
       { path: "/minecraft", element: <MinecraftPage /> },
       { path: "/minecraft/:id", element: <MCServerPage /> },

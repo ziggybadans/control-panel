@@ -40,6 +40,7 @@ export const DEFAULT_WIDGETS: WidgetPref[] = [
   { id: "diskio", visible: true, size: 2 },
   { id: "system", visible: true, size: 1 },
   { id: "temps", visible: true, size: 1 },
+  { id: "fans", visible: true, size: 1 },
   { id: "storage", visible: true, size: 2 },
   { id: "minecraft", visible: true, size: 2 },
   { id: "services", visible: true, size: 1 },

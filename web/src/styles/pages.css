@@ -301,3 +301,57 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* --- Fans ------------------------------------------------------------------- */
+
+.fans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: var(--gap);
+  align-items: start;
+}
+.curve-editor {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+}
+.curve-editor svg {
+  display: block;
+  touch-action: none;
+  user-select: none;
+}
+.curve-pt-hit {
+  cursor: grab;
+}
+.curve-pt-hit:active {
+  cursor: grabbing;
+}
+
+/* Range slider, styled to the control tokens. */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  outline: none;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  cursor: pointer;
+}
+.slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  cursor: pointer;
+}

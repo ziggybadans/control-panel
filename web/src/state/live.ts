@@ -4,7 +4,7 @@
 // tick re-renders only the widgets that display it.
 
 import { useSyncExternalStore } from "react";
-import type { Job, MCServer, Service, Snapshot } from "../api/types";
+import type { FansLive, Job, MCServer, Service, Snapshot } from "../api/types";
 import { api } from "../api/client";
 
 const HISTORY_MAX = 600;
@@ -36,6 +36,7 @@ const latest = new Store<Snapshot | null>(null);
 const services = new Store<Service[]>([]);
 const mcServers = new Store<MCServer[]>([]);
 const jobs = new Store<Job[]>([]);
+const fansLive = new Store<FansLive>({ fans: [], sensors: [] });
 const conn = new Store<ConnState>("connecting");
 
 function pushSnapshot(s: Snapshot) {
@@ -91,6 +92,9 @@ function connect() {
   source.addEventListener("jobs", (e) => {
     jobs.set(JSON.parse((e as MessageEvent).data) ?? []);
   });
+  source.addEventListener("fans", (e) => {
+    fansLive.set(JSON.parse((e as MessageEvent).data) ?? { fans: [], sensors: [] });
+  });
 }
 
 // --- hooks ------------------------------------------------------------------
@@ -120,6 +124,10 @@ export function useMCServer(id: string): MCServer | undefined {
 
 export function useJobs(): Job[] {
   return useSyncExternalStore(jobs.subscribe, jobs.get);
+}
+
+export function useFansLive(): FansLive {
+  return useSyncExternalStore(fansLive.subscribe, fansLive.get);
 }
 
 export function useConnState(): ConnState {

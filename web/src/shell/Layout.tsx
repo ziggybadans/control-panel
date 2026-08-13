@@ -10,6 +10,7 @@ import { Spinner } from "../ui/bits";
 const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "/", label: "Dashboard", icon: "dashboard" },
   { to: "/storage", label: "Storage", icon: "storage" },
+  { to: "/fans", label: "Fans", icon: "fan" },
   { to: "/services", label: "Services", icon: "services" },
   { to: "/minecraft", label: "Minecraft", icon: "minecraft" },
   { to: "/plex", label: "Plex", icon: "plex" },
@@ -21,6 +22,7 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
 const TITLES: Record<string, string> = {
   "/": "Dashboard",
   "/storage": "Storage",
+  "/fans": "Fans",
   "/services": "Services",
   "/minecraft": "Minecraft",
   "/plex": "Plex",

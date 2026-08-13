@@ -22,6 +22,7 @@ export interface FeatureInfo {
   minecraftRunAs?: string;
   power: boolean;
   updateRepo?: string;
+  fanControl: boolean;
 }
 
 export interface PanelInfo {
@@ -70,6 +71,51 @@ export interface Snapshot {
   net: NetRate[];
   disk: DiskRate[];
   temps: Temp[];
+}
+
+// Fans
+
+export interface FanState {
+  id: string;
+  label: string;
+  rpm: number; // -1 = no tach
+  dutyPct: number;
+  mode: "auto" | "manual" | "curve";
+  targetPct?: number;
+  sourceTempC?: number;
+  failsafe?: boolean;
+  err?: string;
+}
+
+export interface FanSensor {
+  id: string;
+  label: string;
+  c: number;
+}
+
+export interface FanCurvePoint {
+  tempC: number;
+  dutyPct: number;
+}
+
+export interface FanSettings {
+  mode: "auto" | "manual" | "curve";
+  manualPct?: number;
+  sensor?: string;
+  points?: FanCurvePoint[];
+}
+
+export interface FansLive {
+  fans: FanState[] | null;
+  sensors: FanSensor[] | null;
+}
+
+export interface FansSnapshot {
+  supported: boolean;
+  control: boolean;
+  fans: FanState[] | null;
+  sensors: FanSensor[] | null;
+  settings: Record<string, FanSettings> | null;
 }
 
 // Storage
