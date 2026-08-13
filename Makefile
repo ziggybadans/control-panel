@@ -1,7 +1,10 @@
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: dev dev-backend dev-ui ui build release test vet clean
+.PHONY: dev dev-backend dev-ui ui build release deploy test vet clean
+
+# Server the panel runs on; override with:  make deploy DEPLOY_HOST=user@host
+DEPLOY_HOST ?= ziggy@192.168.0.235
 
 ## Development ---------------------------------------------------------------
 
@@ -26,6 +29,12 @@ release: ui ## static linux/amd64 binary for the Debian server
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 		go build -trimpath -ldflags '$(LDFLAGS)' \
 		-o dist/control-panel-linux-amd64 ./cmd/control-panel
+
+deploy: release ## build, install onto DEPLOY_HOST, restart the panel
+	scp dist/control-panel-linux-amd64 $(DEPLOY_HOST):/tmp/control-panel-new
+	ssh -t $(DEPLOY_HOST) "sudo install -m 0755 /tmp/control-panel-new /usr/local/bin/control-panel \
+		&& rm /tmp/control-panel-new && sudo systemctl restart control-panel \
+		&& systemctl is-active control-panel"
 
 ## macOS menu bar app --------------------------------------------------------
 
