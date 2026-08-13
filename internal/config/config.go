@@ -34,6 +34,16 @@ type Config struct {
 	Minecraft Minecraft `yaml:"minecraft"`
 	Power     Power     `yaml:"power"`
 	Update    Update    `yaml:"update"`
+	Fans      Fans      `yaml:"fans"`
+}
+
+type Fans struct {
+	// Control enables writing fan PWM (manual duty / curves). Monitoring is
+	// always available. Fans stay under firmware control until a curve or
+	// manual duty is explicitly applied in the UI.
+	Control *bool `yaml:"control"`
+	// IntervalMS is the control-loop period (default 2000, min 500).
+	IntervalMS int `yaml:"interval_ms"`
 }
 
 // App is one media-stack integration (Radarr, Sonarr, Overseerr, …).
@@ -239,6 +249,12 @@ func (c *Config) validate() error {
 	if c.Minecraft.Java == "" {
 		c.Minecraft.Java = "java"
 	}
+	if c.Fans.IntervalMS == 0 {
+		c.Fans.IntervalMS = 2000
+	}
+	if c.Fans.IntervalMS < 500 {
+		c.Fans.IntervalMS = 500
+	}
 	if r := c.Update.Repo; r != "" {
 		parts := strings.Split(r, "/")
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" || strings.Contains(r, ":") {
@@ -315,4 +331,9 @@ func parseIPOrCIDR(s string) (*net.IPNet, error) {
 // restarted on panel startup (default true).
 func (c *Config) ResumeMC() bool {
 	return c.Minecraft.Resume == nil || *c.Minecraft.Resume
+}
+
+// FanControl reports whether fan PWM writes are enabled (default true).
+func (c *Config) FanControl() bool {
+	return c.Fans.Control == nil || *c.Fans.Control
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/auth"
 	"github.com/ziggybadans/control-panel/internal/config"
 	"github.com/ziggybadans/control-panel/internal/events"
+	"github.com/ziggybadans/control-panel/internal/fans"
 	"github.com/ziggybadans/control-panel/internal/jobs"
 	"github.com/ziggybadans/control-panel/internal/mc"
 	"github.com/ziggybadans/control-panel/internal/metrics"
@@ -44,6 +45,7 @@ func testServer(t *testing.T, authMode string) *Server {
 		Plex:     plex.NewMockProvider(),
 		Apps:     apps.NewMockProvider(),
 		MC:       mc.NewMockService(bus, runner, dir),
+		Fans:     fans.NewController(fans.NewMockProvider(), bus, dir, time.Second, true),
 	})
 }
 
@@ -68,6 +70,7 @@ func TestDangerousEndpointsRequireConfirmHeader(t *testing.T) {
 		{"POST", "/api/services/smbd.service/stop", "smbd.service"},
 		{"POST", "/api/storage/snapraid/sync", "sync"},
 		{"DELETE", "/api/minecraft/survival/backups/x.tar.gz", "x.tar.gz"},
+		{"PUT", "/api/fans/mock:pwm1", "mock:pwm1"},
 	}
 	for _, c := range cases {
 		// Without X-Confirm: rejected with 428.

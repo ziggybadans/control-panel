@@ -14,6 +14,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/auth"
 	"github.com/ziggybadans/control-panel/internal/config"
 	"github.com/ziggybadans/control-panel/internal/events"
+	"github.com/ziggybadans/control-panel/internal/fans"
 	"github.com/ziggybadans/control-panel/internal/httpd/ui"
 	"github.com/ziggybadans/control-panel/internal/jobs"
 	"github.com/ziggybadans/control-panel/internal/mc"
@@ -42,6 +43,7 @@ type Deps struct {
 	Apps     apps.Provider
 	MC       mc.Service
 	Update   update.Provider
+	Fans     *fans.Controller
 	// Power executes "reboot" or "shutdown" (nil = unsupported platform).
 	Power func(action string) error
 }
@@ -91,6 +93,10 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/services", s.handleServices)
 	m.HandleFunc("POST /api/services/{unit}/{verb}", s.handleServiceAction)
 	m.HandleFunc("GET /api/services/{unit}/logs", s.handleServiceLogs)
+
+	// Fans.
+	m.HandleFunc("GET /api/fans", s.handleFans)
+	m.HandleFunc("PUT /api/fans/{id}", s.handleFanSet)
 
 	// Plex.
 	m.HandleFunc("GET /api/plex", s.handlePlex)

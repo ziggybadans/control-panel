@@ -26,6 +26,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/auth"
 	"github.com/ziggybadans/control-panel/internal/config"
 	"github.com/ziggybadans/control-panel/internal/events"
+	"github.com/ziggybadans/control-panel/internal/fans"
 	"github.com/ziggybadans/control-panel/internal/httpd"
 	"github.com/ziggybadans/control-panel/internal/jobs"
 	"github.com/ziggybadans/control-panel/internal/mc"
@@ -121,6 +122,7 @@ func main() {
 		mcService   mc.Service
 		mcManager   *mc.Manager
 		updateProv  update.Provider
+		fansProv    fans.Provider
 		powerFn     func(string) error
 	)
 	if mock {
@@ -131,6 +133,7 @@ func main() {
 		appsProv = apps.NewMockProvider()
 		mcService = mc.NewMockService(bus, runner, cfg.DataDir)
 		updateProv = update.NewMockProvider(version)
+		fansProv = fans.NewMockProvider()
 		powerFn = func(action string) error {
 			slog.Info("mock power action (no-op)", "action", action)
 			return nil
@@ -144,6 +147,7 @@ func main() {
 		mcManager = mc.NewManager(cfg.Minecraft, cfg.DataDir, bus, runner)
 		mcService = mcManager
 		updateProv = update.NewClient(cfg.Update.Repo, cfg.Update.Token, version)
+		fansProv = newLinuxFans()
 		powerFn = func(action string) error {
 			verb := map[string]string{"reboot": "reboot", "shutdown": "poweroff"}[action]
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -168,6 +172,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go sampler.Run(ctx)
+
+	fansCtl := fans.NewController(fansProv, bus, cfg.DataDir,
+		time.Duration(cfg.Fans.IntervalMS)*time.Millisecond, cfg.FanControl())
+	go fansCtl.Run(ctx)
 
 	// Service state watcher: cheap poll, published to all SSE clients.
 	go func() {
@@ -205,6 +213,7 @@ func main() {
 		Apps:     appsProv,
 		MC:       mcService,
 		Update:   updateProv,
+		Fans:     fansCtl,
 		Power:    powerFn,
 	})
 
@@ -220,6 +229,9 @@ func main() {
 		fatal(err)
 	case <-ctx.Done():
 		slog.Info("shutting down")
+		// Hand fans back to firmware before exiting: a dead panel must
+		// never leave a fan pinned at a low manual duty.
+		fansCtl.ReleaseAll()
 		if mcManager != nil {
 			// Stop game servers cleanly before the panel exits (children
 			// die with the panel process otherwise).

@@ -31,7 +31,10 @@ PrivateTmp=true
 ProtectHome=read-only
 ProtectClock=true
 ProtectHostname=true
-ProtectKernelTunables=true
+# ProtectKernelTunables would mount /sys read-only, which blocks hwmon PWM
+# writes — i.e. the Fans page's curve/manual control. Set it to true if you
+# don't use fan control.
+ProtectKernelTunables=false
 ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true

@@ -34,6 +34,7 @@ type featureInfo struct {
 	MinecraftRunAs string `json:"minecraftRunAs,omitempty"`
 	Power          bool   `json:"power"`
 	UpdateRepo     string `json:"updateRepo,omitempty"`
+	FanControl     bool   `json:"fanControl"`
 }
 
 func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
@@ -59,6 +60,7 @@ func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
 				MinecraftRunAs: s.Cfg.Minecraft.RunAs,
 				Power:          s.Cfg.Power.Allow,
 				UpdateRepo:     s.Cfg.Update.Repo,
+				FanControl:     s.Cfg.FanControl(),
 			},
 		},
 	})
@@ -80,6 +82,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	// Initial state so the client never renders empty panels.
 	_ = sse.send("mc", s.MC.List())
+	if s.Fans != nil {
+		_ = sse.send("fans", s.Fans.LiveState())
+	}
 	if svcs, err := s.Services.List(r.Context()); err == nil {
 		_ = sse.send("services", svcs)
 	}

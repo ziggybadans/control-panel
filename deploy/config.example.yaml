@@ -122,6 +122,16 @@ minecraft:
   #    jar: neoforge-launcher.jar   # override jar auto-detection
   #    jvm_args: ["-Dfml.readTimeout=180"]
 
+fans:
+  # Fan curves / manual duty write hwmon PWM values; set false to make the
+  # Fans page monitoring-only. Fans stay under firmware control until a
+  # curve or manual duty is explicitly applied in the UI. If a curve's
+  # sensor becomes unreadable the fan is driven to 100% (failsafe), and the
+  # panel restores firmware control on shutdown.
+  control: true
+  # Control-loop period in milliseconds (min 500).
+  interval_ms: 2000
+
 power:
   # Enable the reboot/shutdown endpoints (typed confirmation still required).
   allow: false
