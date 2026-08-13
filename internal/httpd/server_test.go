@@ -21,6 +21,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/prefs"
 	"github.com/ziggybadans/control-panel/internal/services"
 	"github.com/ziggybadans/control-panel/internal/storage"
+	"github.com/ziggybadans/control-panel/internal/term"
 )
 
 func testServer(t *testing.T, authMode string) *Server {
@@ -51,6 +52,7 @@ func testServer(t *testing.T, authMode string) *Server {
 			{Name: "data", Path: dir},
 			{Name: "ro", Path: dir, ReadOnly: true},
 		}),
+		Term: term.NewManager(term.NewMockLauncher(), 2, time.Minute),
 	})
 }
 
@@ -76,6 +78,7 @@ func TestDangerousEndpointsRequireConfirmHeader(t *testing.T) {
 		{"POST", "/api/storage/snapraid/sync", "sync"},
 		{"DELETE", "/api/minecraft/survival/backups/x.tar.gz", "x.tar.gz"},
 		{"PUT", "/api/fans/mock:pwm1", "mock:pwm1"},
+		{"POST", "/api/terminal", "terminal"},
 	}
 	for _, c := range cases {
 		// Without X-Confirm: rejected with 428.
@@ -201,5 +204,21 @@ func TestPowerDisabledByDefault(t *testing.T) {
 	})
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("power action with power.allow=false: got %d, want 403", rec.Code)
+	}
+}
+
+func TestTerminalDisabledWithoutLauncher(t *testing.T) {
+	s := testServer(t, "none")
+	s.Term = term.NewManager(nil, 2, time.Minute) // feature not configured
+	h := s.Handler()
+	rec := do(h, "POST", "/api/terminal", map[string]string{
+		"X-CP": "1", "X-Confirm": "terminal",
+	})
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("terminal create while disabled: got %d, want 403", rec.Code)
+	}
+	rec = do(h, "GET", "/api/terminal", map[string]string{"X-CP": "1"})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"enabled":false`) {
+		t.Errorf("terminal status while disabled: got %d %s", rec.Code, rec.Body.String())
 	}
 }

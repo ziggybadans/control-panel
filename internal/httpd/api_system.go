@@ -45,6 +45,7 @@ type featureInfo struct {
 	UpdateRepo     string `json:"updateRepo,omitempty"`
 	FanControl     bool   `json:"fanControl"`
 	FileRoots      int    `json:"fileRoots"`
+	Terminal       bool   `json:"terminal"`
 }
 
 func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +73,7 @@ func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
 				UpdateRepo:     s.Cfg.Update.Repo,
 				FanControl:     s.Cfg.FanControl(),
 				FileRoots:      fileRootCount(s.Files),
+				Terminal:       s.Term != nil && s.Term.Enabled(),
 			},
 		},
 	})

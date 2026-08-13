@@ -122,6 +122,22 @@ minecraft:
   #    jar: neoforge-launcher.jar   # override jar auto-detection
   #    jvm_args: ["-Dfml.readTimeout=180"]
 
+# Web terminal (Terminal page). OFF by default: a terminal is a real shell,
+# i.e. the one deliberate exception to the panel's allowlist-only execution
+# model. Opening a session requires typed confirmation and is audited;
+# sessions are capped and idle ones are closed. When the panel runs as root
+# you MUST pick a run_as user (or explicitly accept root shells).
+terminal:
+  enabled: false
+  # Unprivileged user shells run as. Create one with:
+  #   useradd --system --create-home --shell /bin/bash panel-shell
+  # (add it to groups as needed, or use your own login user)
+  run_as: ""
+  # allow_root: true   # root shells — strongly discouraged
+  # shell: /bin/bash
+  idle_timeout_min: 15
+  max_sessions: 2
+
 # General file manager (Files page): browse, upload, download (folders
 # stream as zip), rename, delete. Every operation is confined to its root —
 # no "..", and symlinks may not lead outside. Deletes require typed

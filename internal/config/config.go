@@ -37,6 +37,29 @@ type Config struct {
 	Update    Update    `yaml:"update"`
 	Fans      Fans      `yaml:"fans"`
 	Files     Files     `yaml:"files"`
+	Terminal  Terminal  `yaml:"terminal"`
+}
+
+// Terminal configures the opt-in web terminal — the one deliberate
+// exception to the allowlist-exec rule, so it is off by default and heavily
+// fenced (see internal/term).
+type Terminal struct {
+	// Enabled turns the Terminal page on. Off by default.
+	Enabled bool `yaml:"enabled"`
+	// RunAs is the system user shells run as. Required when the panel runs
+	// as root (unless AllowRoot); create a user for it, e.g.:
+	//   useradd --system --create-home --shell /bin/bash panel-shell
+	RunAs string `yaml:"run_as"`
+	// AllowRoot permits root shells when the panel itself runs as root.
+	// Strongly discouraged.
+	AllowRoot bool `yaml:"allow_root"`
+	// Shell overrides the launched shell (default /bin/bash).
+	Shell string `yaml:"shell"`
+	// IdleTimeoutMin closes sessions with no input after this many minutes
+	// (default 15).
+	IdleTimeoutMin int `yaml:"idle_timeout_min"`
+	// MaxSessions caps concurrent sessions (default 2, max 8).
+	MaxSessions int `yaml:"max_sessions"`
 }
 
 // Files configures the general file manager.
@@ -273,6 +296,15 @@ func (c *Config) validate() error {
 	}
 	if c.Fans.IntervalMS < 500 {
 		c.Fans.IntervalMS = 500
+	}
+	if c.Terminal.IdleTimeoutMin <= 0 {
+		c.Terminal.IdleTimeoutMin = 15
+	}
+	if c.Terminal.MaxSessions <= 0 {
+		c.Terminal.MaxSessions = 2
+	}
+	if c.Terminal.MaxSessions > 8 {
+		c.Terminal.MaxSessions = 8
 	}
 	seenRoots := map[string]bool{}
 	for i, root := range c.Files.Roots {

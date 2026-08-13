@@ -8,3 +8,7 @@ auth:
 metrics:
   interval_ms: 1000
   history: 600
+
+# Mock mode gives the Terminal page a simulated shell (nothing executes).
+terminal:
+  enabled: true

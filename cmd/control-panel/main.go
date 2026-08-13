@@ -36,6 +36,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/prefs"
 	"github.com/ziggybadans/control-panel/internal/services"
 	"github.com/ziggybadans/control-panel/internal/storage"
+	cpterm "github.com/ziggybadans/control-panel/internal/term"
 	"github.com/ziggybadans/control-panel/internal/update"
 )
 
@@ -190,6 +191,23 @@ func main() {
 	}
 	filesSvc := files.New(filesRoots)
 
+	// Terminal: mock mode gets a simulated shell; real mode builds a PTY
+	// launcher (with run_as safety checks) only when explicitly enabled.
+	var termLauncher cpterm.Launcher
+	if cfg.Terminal.Enabled {
+		if mock {
+			termLauncher = cpterm.NewMockLauncher()
+		} else {
+			l, err := newTermLauncher(cfg)
+			if err != nil {
+				fatal(err)
+			}
+			termLauncher = l
+		}
+	}
+	termMgr := cpterm.NewManager(termLauncher, cfg.Terminal.MaxSessions,
+		time.Duration(cfg.Terminal.IdleTimeoutMin)*time.Minute)
+
 	// Service state watcher: cheap poll, published to all SSE clients.
 	go func() {
 		t := time.NewTicker(5 * time.Second)
@@ -228,6 +246,7 @@ func main() {
 		Update:   updateProv,
 		Fans:     fansCtl,
 		Files:    filesSvc,
+		Term:     termMgr,
 		Power:    powerFn,
 	})
 
@@ -243,6 +262,7 @@ func main() {
 		fatal(err)
 	case <-ctx.Done():
 		slog.Info("shutting down")
+		termMgr.CloseAll()
 		// Hand fans back to firmware before exiting: a dead panel must
 		// never leave a fan pinned at a low manual duty.
 		fansCtl.ReleaseAll()

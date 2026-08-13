@@ -24,6 +24,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/prefs"
 	"github.com/ziggybadans/control-panel/internal/services"
 	"github.com/ziggybadans/control-panel/internal/storage"
+	"github.com/ziggybadans/control-panel/internal/term"
 	"github.com/ziggybadans/control-panel/internal/update"
 )
 
@@ -46,6 +47,7 @@ type Deps struct {
 	Update   update.Provider
 	Fans     *fans.Controller
 	Files    *files.Service
+	Term     *term.Manager
 	// Power executes "reboot" or "shutdown" (nil = unsupported platform).
 	Power func(action string) error
 }
@@ -99,6 +101,14 @@ func (s *Server) routes() {
 	// Fans.
 	m.HandleFunc("GET /api/fans", s.handleFans)
 	m.HandleFunc("PUT /api/fans/{id}", s.handleFanSet)
+
+	// Terminal.
+	m.HandleFunc("GET /api/terminal", s.handleTerminal)
+	m.HandleFunc("POST /api/terminal", s.handleTerminalCreate)
+	m.HandleFunc("GET /api/terminal/{id}/stream", s.handleTerminalStream)
+	m.HandleFunc("POST /api/terminal/{id}/input", s.handleTerminalInput)
+	m.HandleFunc("POST /api/terminal/{id}/resize", s.handleTerminalResize)
+	m.HandleFunc("DELETE /api/terminal/{id}", s.handleTerminalClose)
 
 	// File manager.
 	m.HandleFunc("GET /api/files", s.handleFilesRoots)
