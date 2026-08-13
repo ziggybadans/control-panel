@@ -179,6 +179,7 @@ function WidgetCard({
     startSize: number;
     colW: number;
     gap: number;
+    vGap: number;
     cols: number;
     h: number;
   } | null>(null);
@@ -215,6 +216,7 @@ function WidgetCard({
     const cs = getComputedStyle(grid);
     const cols = cs.gridTemplateColumns.split(" ").length;
     const gap = parseFloat(cs.columnGap) || 14;
+    const vGap = parseFloat(cs.rowGap) || gap;
     const colW = (grid.getBoundingClientRect().width - (cols - 1) * gap) / cols;
     const startH = card.getBoundingClientRect().height;
     resize.current = {
@@ -224,6 +226,7 @@ function WidgetCard({
       startSize: w.size,
       colW,
       gap,
+      vGap,
       cols,
       h: startH,
     };
@@ -233,7 +236,14 @@ function WidgetCard({
   function onGrabberMove(e: ReactPointerEvent) {
     const r = resize.current;
     if (!r) return;
-    r.h = Math.min(MAX_H, Math.max(minH, Math.round(r.startH + e.clientY - r.startY)));
+    // Heights snap to the masonry row rhythm (n rows + their gaps), so
+    // resized neighbours line up exactly instead of drifting by a few px.
+    const unit = ROW + r.vGap;
+    const want = r.startH + e.clientY - r.startY;
+    const rows = Math.round((want + r.vGap) / unit);
+    const snapped = rows * unit - r.vGap;
+    const minSnapped = Math.ceil((minH + r.vGap) / unit) * unit - r.vGap;
+    r.h = Math.min(MAX_H, Math.max(minSnapped, snapped));
     setLiveH(r.h);
     const wantPx = r.startSize * r.colW + (r.startSize - 1) * r.gap + (e.clientX - r.startX);
     const size = Math.min(r.cols, Math.max(1, Math.round((wantPx + r.gap) / (r.colW + r.gap))));
