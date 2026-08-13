@@ -728,6 +728,19 @@ textarea.input {
   color: var(--text-3);
   text-align: center;
 }
+/* Keep hint copy in a readable measure instead of one page-wide line. */
+.empty .small {
+  max-width: 56ch;
+}
+
+/* Explanatory footnote under a page's content. */
+.page-note {
+  margin: 0;
+  max-width: 88ch;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text-3);
+}
 
 .kbd {
   font-family: var(--font-mono);

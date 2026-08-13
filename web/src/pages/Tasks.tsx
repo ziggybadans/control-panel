@@ -201,28 +201,30 @@ export function TasksPage() {
         </button>
       </TopbarActions>
 
-      {isLoading ? (
-        <Spinner />
-      ) : schedules.length === 0 ? (
-        <EmptyState
-          icon="clock"
-          title="No scheduled tasks"
-          hint="Automate Minecraft backups, service restarts, snapraid runs, or console commands on a schedule. Tasks only run panel actions — never arbitrary commands."
-        />
-      ) : (
-        <div className="card">
-          <div className="card-b flush">
+      <div className="card">
+        <div className="card-b flush">
+          {isLoading ? (
+            <div className="empty">
+              <Spinner size={20} />
+            </div>
+          ) : schedules.length === 0 ? (
+            <EmptyState
+              icon="clock"
+              title="No scheduled tasks"
+              hint="Automate Minecraft backups, service restarts, snapraid runs, or console commands on a schedule. Tasks only run panel actions — never arbitrary commands."
+            />
+          ) : (
             <ScheduleTable schedules={schedules} onEdit={(s) => setEditing(s)} />
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
-      <div className="small faint">
+      <p className="page-note">
         Failed runs retry twice at 5-minute intervals before waiting for the
         next occurrence. Every execution is recorded in the{" "}
-        <a href="#/activity">audit log</a>. Minecraft-specific tasks also
-        appear on each server's Tasks tab.
-      </div>
+        <a href="#/activity">audit log</a>. Minecraft-specific tasks also appear
+        on each server's Tasks tab.
+      </p>
 
       {editing && (
         <TaskEditor
