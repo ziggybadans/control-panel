@@ -84,6 +84,12 @@ func StreamZip(ctx context.Context, root, rel string, w io.Writer) error {
 			return err
 		}
 		if d.IsDir() {
+			// Kernel pseudo-filesystems (/proc, /sys, /dev, /run…) are not
+			// user data, and some of their files lie about being regular
+			// (/proc/kcore); matters when a root spans the whole system.
+			if isPseudoFS(path) {
+				return filepath.SkipDir
+			}
 			_, err := zw.Create(name + "/")
 			return err
 		}
