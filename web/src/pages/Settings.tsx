@@ -1,11 +1,14 @@
 // Settings: appearance customization, dashboard reset, safety reference,
-// power actions, and about.
+// updates, power actions, and about.
 
 import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
+import type { UpdateStatus } from "../api/types";
+import { fmtBytes } from "../lib/format";
 import { usePrefs, type Accent, type Density, type Theme } from "../state/prefs";
 import { useSystem } from "../state/system";
-import { Card } from "../ui/bits";
+import { Card, Spinner } from "../ui/bits";
 import { useConfirm } from "../ui/Confirm";
 import { Icon } from "../ui/Icon";
 import { useToast } from "../ui/Toast";
@@ -123,10 +126,168 @@ export function SettingsPage() {
           </div>
         </Card>
 
+        <UpdatesCard />
         <PowerCard />
         <AboutCard />
       </div>
     </div>
+  );
+}
+
+/** Strips the leading "v" so tags compare against build versions. */
+function vNormalize(v: string): string {
+  return v.replace(/^v/, "");
+}
+
+function UpdatesCard() {
+  const confirm = useConfirm();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["update"],
+    queryFn: () => api<UpdateStatus>("/api/update"),
+    staleTime: 60_000,
+  });
+  const [checking, setChecking] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "installing" | "restarting">("idle");
+
+  async function check() {
+    setChecking(true);
+    try {
+      const st = await api<UpdateStatus>("/api/update?refresh=1");
+      qc.setQueryData(["update"], st);
+      if (st.error) toast("error", st.error);
+      else if (st.updateAvailable) toast("ok", `update available: ${st.latest?.tag}`);
+      else toast("ok", "panel is up to date");
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "update check failed");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function install() {
+    const tag = data?.latest?.tag;
+    if (!tag) return;
+    const ok = await confirm({
+      title: "Install panel update",
+      target: tag,
+      typed: true,
+      body: (
+        <>
+          Downloads <b>{tag}</b> from <span className="mono">{data?.repo}</span>,
+          verifies its checksum, replaces the panel binary, and restarts the
+          panel service. Running Minecraft servers are stopped gracefully and
+          resumed after the restart; expect the panel to be away for ~10 seconds.
+        </>
+      ),
+      confirmLabel: "Install & restart",
+    });
+    if (!ok) return;
+    setPhase("installing");
+    try {
+      await api("/api/update/apply", { method: "POST", body: { tag }, confirm: tag });
+      setPhase("restarting");
+      // Wait for the panel to go down and come back on the new version.
+      // If it never goes down (mock mode), settle after a few steady polls.
+      const deadline = Date.now() + 120_000;
+      let sawDown = false;
+      let steady = 0;
+      await new Promise((r) => setTimeout(r, 3000));
+      while (Date.now() < deadline) {
+        try {
+          const h = await api<{ version: string }>("/api/health");
+          if (vNormalize(h.version) === vNormalize(tag) || sawDown || ++steady >= 5) break;
+        } catch {
+          sawDown = true;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      window.location.reload();
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "update failed");
+      setPhase("idle");
+    }
+  }
+
+  const latest = data?.latest;
+  return (
+    <Card title="Updates">
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="row small">
+          <span className="muted">Installed</span>
+          <span className="num">{data?.current ?? "—"}</span>
+          {data?.configured && latest && (
+            <>
+              <span className="faint">·</span>
+              <span className="muted">Latest</span>
+              <span className="num">{latest.tag}</span>
+            </>
+          )}
+          {data?.configured &&
+            (data.updateAvailable ? (
+              <span className="badge warn right">update available</span>
+            ) : data.error ? (
+              <span className="badge crit right">check failed</span>
+            ) : (
+              <span className="badge ok right">up to date</span>
+            ))}
+        </div>
+
+        {!data?.configured && (
+          <div className="small faint">
+            Not configured — set <span className="mono">update.repo</span> in
+            config.yaml to enable in-panel updates from GitHub releases.
+          </div>
+        )}
+        {data?.error && <div className="small crit-text">{data.error}</div>}
+
+        {data?.updateAvailable && latest && (
+          <div className="small">
+            <div className="row faint" style={{ marginBottom: 4 }}>
+              <span className="num">
+                {latest.publishedAt ? latest.publishedAt.slice(0, 10) : ""}
+              </span>
+              <span>· {fmtBytes(latest.assetSize)}</span>
+            </div>
+            {latest.notes && (
+              <div
+                className="mono muted"
+                style={{ whiteSpace: "pre-wrap", maxHeight: 140, overflowY: "auto" }}
+              >
+                {latest.notes}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="row">
+          <button className="btn btn-sm" disabled={checking || phase !== "idle"} onClick={check}>
+            {checking ? <Spinner size={11} /> : <Icon name="restart" size={12} />}
+            Check for updates
+          </button>
+          {data?.updateAvailable && latest && (
+            <button
+              className="btn btn-sm btn-danger"
+              disabled={phase !== "idle"}
+              onClick={install}
+            >
+              {phase !== "idle" ? <Spinner size={11} /> : <Icon name="download" size={12} />}
+              {phase === "installing"
+                ? "Installing…"
+                : phase === "restarting"
+                  ? "Restarting…"
+                  : `Install ${latest.tag}`}
+            </button>
+          )}
+        </div>
+        <div className="small faint">
+          Updates install only from the pinned repo, are sha256-verified against
+          the release manifest, and keep the previous binary as{" "}
+          <span className="mono">control-panel.old</span> for rollback.
+        </div>
+      </div>
+    </Card>
   );
 }
 

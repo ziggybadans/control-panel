@@ -329,3 +329,19 @@ export interface AuditResponse {
   entries: AuditEntry[] | null;
   total: number;
 }
+
+export interface UpdateRelease {
+  tag: string;
+  notes: string;
+  publishedAt: string;
+  assetSize: number;
+}
+
+export interface UpdateStatus {
+  configured: boolean;
+  repo?: string;
+  current: string;
+  latest?: UpdateRelease | null;
+  updateAvailable: boolean;
+  error?: string;
+}

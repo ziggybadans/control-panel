@@ -22,6 +22,7 @@ import (
 	"github.com/ziggybadans/control-panel/internal/prefs"
 	"github.com/ziggybadans/control-panel/internal/services"
 	"github.com/ziggybadans/control-panel/internal/storage"
+	"github.com/ziggybadans/control-panel/internal/update"
 )
 
 type Deps struct {
@@ -40,6 +41,7 @@ type Deps struct {
 	Plex     plex.Provider
 	Apps     apps.Provider
 	MC       mc.Service
+	Update   update.Provider
 	// Power executes "reboot" or "shutdown" (nil = unsupported platform).
 	Power func(action string) error
 }
@@ -123,6 +125,8 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/jobs/{id}", s.handleJobGet)
 	m.HandleFunc("POST /api/jobs/{id}/cancel", s.handleJobCancel)
 	m.HandleFunc("POST /api/power/{action}", s.handlePower)
+	m.HandleFunc("GET /api/update", s.handleUpdateStatus)
+	m.HandleFunc("POST /api/update/apply", s.handleUpdateApply)
 
 	// Embedded UI (catch-all).
 	m.Handle("/", ui.Handler())

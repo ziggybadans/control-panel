@@ -26,6 +26,7 @@ type Config struct {
 	Apps      []App     `yaml:"apps"`
 	Minecraft Minecraft `yaml:"minecraft"`
 	Power     Power     `yaml:"power"`
+	Update    Update    `yaml:"update"`
 }
 
 // App is one media-stack integration (Radarr, Sonarr, Overseerr, …).
@@ -124,6 +125,16 @@ type Power struct {
 	Allow bool `yaml:"allow"`
 }
 
+type Update struct {
+	// Repo pins the GitHub "owner/name" repository the panel updates itself
+	// from. Only this repo's releases are ever fetched. Empty disables the
+	// in-panel updater.
+	Repo string `yaml:"repo"`
+	// Token authenticates release requests when the repo is private
+	// (fine-grained PAT with contents: read-only). Public repos need none.
+	Token string `yaml:"token"`
+}
+
 // Default returns the built-in configuration.
 func Default() Config {
 	return Config{
@@ -197,6 +208,12 @@ func (c *Config) validate() error {
 	}
 	if c.Minecraft.Java == "" {
 		c.Minecraft.Java = "java"
+	}
+	if r := c.Update.Repo; r != "" {
+		parts := strings.Split(r, "/")
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" || strings.Contains(r, ":") {
+			return fmt.Errorf("update.repo must be \"owner/name\", got %q", r)
+		}
 	}
 	for i := range c.Apps {
 		app := &c.Apps[i]

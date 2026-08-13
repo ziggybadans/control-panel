@@ -107,3 +107,12 @@ minecraft:
 power:
   # Enable the reboot/shutdown endpoints (typed confirmation still required).
   allow: false
+
+update:
+  # In-panel self-updates from this GitHub repo's releases (Settings page).
+  # Only this pinned repo is ever contacted; downloads are sha256-verified
+  # against the release manifest before the binary is swapped and the
+  # service restarted. Empty disables the updater.
+  repo: ""
+  # Fine-grained PAT with contents: read-only — required for private repos.
+  token: ""
