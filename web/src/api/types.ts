@@ -18,6 +18,7 @@ export interface FeatureInfo {
   snapraid: boolean;
   plex: boolean;
   apps: number;
+  qbittorrent: boolean;
   minecraftRoot: string;
   minecraftRunAs?: string;
   power: boolean;
@@ -347,6 +348,93 @@ export interface AppStatus {
 export interface AppsResponse {
   configured: boolean;
   apps: AppStatus[] | null;
+}
+
+// qBittorrent
+
+/**
+ * Whether a still-downloading file can be started now without playback
+ * catching up to the download. "unknown" means the torrent isn't matched to
+ * a Radarr/Sonarr item, so its runtime is unknown.
+ */
+export interface QbitWatch {
+  verdict: "ready" | "now" | "wait" | "stalled" | "paused" | "queued" | "unknown";
+  etaSec?: number;
+  waitSec?: number;
+  runtimeSec?: number;
+  sequential: boolean;
+}
+
+export interface QbitTorrent {
+  hash: string;
+  name: string;
+  state: string;
+  category?: string;
+  tags?: string;
+  sizeBytes: number;
+  downloaded: number;
+  leftBytes: number;
+  progress: number; // 0-1
+  dlSpeed: number; // bytes/s
+  upSpeed: number;
+  etaSec: number; // qBittorrent's estimate (0 = unknown)
+  ratio: number;
+  seeds: number;
+  seedsTotal: number;
+  peers: number;
+  peersTotal: number;
+  priority: number;
+  sequential: boolean;
+  firstLast: boolean;
+  forceStart: boolean;
+  addedOn: number; // unix seconds
+  completedOn?: number;
+  savePath?: string;
+  contentPath?: string;
+  availability?: number;
+  tracker?: string;
+  media?: string; // matched Radarr/Sonarr title
+  mediaKind?: string;
+  mediaApp?: string;
+  runtimeSec?: number;
+  watch: QbitWatch;
+}
+
+export interface QbitTransfer {
+  dlSpeed: number;
+  upSpeed: number;
+  dlData: number;
+  upData: number;
+  dlLimit: number; // bytes/s, 0 = unlimited
+  upLimit: number;
+  altSpeed: boolean;
+  connection: string;
+  dhtNodes: number;
+  freeSpace?: number;
+  queueing: boolean;
+}
+
+export interface QbitStatus {
+  configured: boolean;
+  reachable: boolean;
+  error?: string;
+  version?: string;
+  url?: string;
+  allowActions: boolean;
+  transfer: QbitTransfer;
+  torrents: QbitTorrent[] | null;
+  total: number;
+}
+
+export interface QbitFile {
+  name: string;
+  sizeBytes: number;
+  progress: number;
+  priority: number;
+}
+
+export interface QbitFilesResponse {
+  files: QbitFile[] | null;
 }
 
 // Minecraft file manager / addons / map / setup

@@ -40,6 +40,6 @@ export const WIDGETS: Record<string, WidgetDef> = {
   storage: { title: "Storage", component: StorageWidget, minH: 150 },
   minecraft: { title: "Minecraft", component: MinecraftWidget, minH: 100 },
   services: { title: "Services", component: ServicesWidget, minH: 110 },
-  plex: { title: "Plex", component: PlexWidget, minH: 100 },
+  plex: { title: "Plex & downloads", component: PlexWidget, minH: 130 },
   apps: { title: "Media apps", component: MediaAppsWidget, minH: 100 },
 };

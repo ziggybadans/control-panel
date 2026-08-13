@@ -7,6 +7,13 @@
       "runtimeArgs": ["--mock", "--config", "deploy/config.dev.yaml"],
       "port": 9090,
       "autoPort": false
+    },
+    {
+      "name": "panel-ui",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "web"],
+      "port": 5173,
+      "autoPort": false
     }
   ]
 }

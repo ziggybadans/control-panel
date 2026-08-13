@@ -4,8 +4,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
-import type { AppsResponse, PlexStatus, Smart, StorageOverview } from "../../api/types";
-import { fmtBytes, fmtPct, fmtTemp } from "../../lib/format";
+import type {
+  AppsResponse,
+  PlexStatus,
+  QbitStatus,
+  QbitTorrent,
+  Smart,
+  StorageOverview,
+} from "../../api/types";
+import { fmtBytes, fmtDuration, fmtPct, fmtRate, fmtTemp } from "../../lib/format";
+import { isDownloading, watchBadge } from "../../lib/qbit";
 import { useFansLive, useLatestMetrics, useMCServers, useServices } from "../../state/live";
 import { useSystem } from "../../state/system";
 import { CapacityBar, MCStateBadge, ServiceBadge } from "../../ui/bits";
@@ -376,51 +384,198 @@ export function MediaAppsWidget() {
   );
 }
 
-// --- Plex -------------------------------------------------------------------
+// --- Plex & downloads -------------------------------------------------------
 
+/**
+ * What is playing now, and what is on its way in: active qBittorrent
+ * downloads with their rate, ETA, and whether they can be started before
+ * the download finishes. Falls back to the *arr queues when qBittorrent
+ * isn't configured.
+ */
 export function PlexWidget() {
   const { data } = useQuery({
     queryKey: ["plex"],
     queryFn: () => api<PlexStatus>("/api/plex"),
     refetchInterval: 10_000,
   });
+  const { data: qbit } = useQuery({
+    queryKey: ["qbit"],
+    queryFn: () => api<QbitStatus>("/api/qbit"),
+    refetchInterval: 6_000,
+  });
+  // Only needed as a stand-in when there is no download client configured.
+  const { data: apps } = useQuery({
+    queryKey: ["apps"],
+    queryFn: () => api<AppsResponse>("/api/apps"),
+    refetchInterval: 15_000,
+    enabled: qbit !== undefined && !qbit.configured,
+  });
+
   if (!data) return null;
-  if (!data.configured) {
+  const sessions = data.sessions ?? [];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <section>
+        <div className="row" style={{ marginBottom: 4 }}>
+          <span className="label">Now playing</span>
+          {data.configured && data.reachable && sessions.length > 0 && (
+            <span className="right small num muted">
+              {sessions.length} stream{sessions.length > 1 ? "s" : ""}
+              {sessions.some((s) => s.decision === "transcode") &&
+                ` · ${sessions.filter((s) => s.decision === "transcode").length} transcoding`}
+            </span>
+          )}
+        </div>
+        {!data.configured ? (
+          <div className="small faint">
+            Not configured — set <span className="mono">plex.token</span> in
+            config.yaml.
+          </div>
+        ) : !data.reachable ? (
+          <div className="small crit-text">Unreachable: {data.error}</div>
+        ) : sessions.length === 0 ? (
+          <div className="small faint">Nothing is playing right now.</div>
+        ) : (
+          <div className="mini-rows">
+            {sessions.map((s, i) => (
+              <div key={i} className="mini-row" style={{ alignItems: "flex-start" }}>
+                <div className="grow" style={{ minWidth: 0 }}>
+                  <div className="truncate" style={{ fontWeight: 550 }}>
+                    {s.grandparent ? `${s.grandparent} — ${s.title}` : s.title}
+                  </div>
+                  <div className="small faint truncate">
+                    {s.user} · {s.player}
+                    {s.decision === "transcode" ? " · transcode" : ""}
+                  </div>
+                  <div className="bar" style={{ marginTop: 5 }}>
+                    <i
+                      style={{
+                        width: `${s.durationMs ? ((s.progressMs / s.durationMs) * 100).toFixed(1) : 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+                {s.state === "paused" && <span className="badge neutral">paused</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <DownloadsSection qbit={qbit} apps={apps} />
+    </div>
+  );
+}
+
+/** Active downloads: qBittorrent when configured, else the *arr queues. */
+function DownloadsSection({
+  qbit,
+  apps,
+}: {
+  qbit?: QbitStatus;
+  apps?: AppsResponse;
+}) {
+  if (qbit && qbit.configured) {
+    const active = (qbit.torrents ?? [])
+      .filter((t) => isDownloading(t.state))
+      .sort((a, b) => (a.watch.etaSec || a.etaSec || 1e9) - (b.watch.etaSec || b.etaSec || 1e9));
     return (
-      <div className="small faint">
-        Not configured — set <span className="mono">plex.token</span> in config.yaml.
-      </div>
+      <section>
+        <div className="row" style={{ marginBottom: 4 }}>
+          <span className="label">Downloading</span>
+          <Link to="/qbittorrent" className="right small num muted" style={{ textDecoration: "none" }}>
+            {qbit.reachable ? `${fmtRate(qbit.transfer.dlSpeed)} ↓` : ""}
+          </Link>
+        </div>
+        {!qbit.reachable ? (
+          <div className="small crit-text truncate" title={qbit.error}>
+            qBittorrent unreachable: {qbit.error}
+          </div>
+        ) : active.length === 0 ? (
+          <div className="small faint">Nothing is downloading.</div>
+        ) : (
+          <div className="mini-rows">
+            {active.slice(0, 4).map((t) => (
+              <DownloadRow key={t.hash} t={t} />
+            ))}
+            {active.length > 4 && (
+              <Link to="/qbittorrent" className="small">
+                {active.length - 4} more →
+              </Link>
+            )}
+          </div>
+        )}
+      </section>
     );
   }
-  if (!data.reachable) {
-    return <div className="small crit-text">Unreachable: {data.error}</div>;
-  }
+
+  // No download client configured: the *arr queues still say what is coming.
+  const queue = (apps?.apps ?? []).flatMap((a) => a.queue ?? []);
+  if (!apps?.configured || queue.length === 0) return null;
   return (
-    <div className="mini-rows">
-      {(data.sessions ?? []).length === 0 && (
-        <div className="small faint">Nothing is playing right now.</div>
-      )}
-      {(data.sessions ?? []).map((s, i) => (
-        <div key={i} className="mini-row" style={{ alignItems: "flex-start" }}>
-          <div className="grow" style={{ minWidth: 0 }}>
-            <div className="truncate" style={{ fontWeight: 550 }}>
-              {s.grandparent ? `${s.grandparent} — ${s.title}` : s.title}
-            </div>
-            <div className="small faint truncate">
-              {s.user} · {s.player}
-              {s.decision === "transcode" ? " · transcode" : ""}
-            </div>
-            <div className="bar" style={{ marginTop: 5 }}>
-              <i
-                style={{
-                  width: `${s.durationMs ? ((s.progressMs / s.durationMs) * 100).toFixed(1) : 0}%`,
-                }}
-              />
+    <section>
+      <div className="label" style={{ marginBottom: 4 }}>
+        Downloading
+      </div>
+      <div className="mini-rows">
+        {queue.slice(0, 4).map((item, i) => (
+          <div key={i} className="mini-row" style={{ alignItems: "flex-start" }}>
+            <div className="grow" style={{ minWidth: 0 }}>
+              <div className="truncate" style={{ fontWeight: 550 }}>
+                {item.title}
+              </div>
+              <div className="small faint truncate">
+                {item.status}
+                {item.timeLeft ? ` · ${item.timeLeft} left` : ""} ·{" "}
+                {fmtPct(item.progress)}
+              </div>
+              <div className="bar" style={{ marginTop: 5 }}>
+                <i style={{ width: `${Math.min(item.progress, 100).toFixed(1)}%` }} />
+              </div>
             </div>
           </div>
-          {s.state === "paused" && <span className="badge neutral">paused</span>}
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DownloadRow({ t }: { t: QbitTorrent }) {
+  const watch = watchBadge(t.watch);
+  const eta = t.watch.etaSec || t.etaSec;
+  return (
+    <Link
+      to="/qbittorrent"
+      className="mini-row"
+      style={{ alignItems: "flex-start", color: "inherit", textDecoration: "none" }}
+    >
+      <div className="grow" style={{ minWidth: 0 }}>
+        <div className="row">
+          <span className="truncate" style={{ fontWeight: 550 }} title={t.name}>
+            {t.media || t.name}
+          </span>
+          {watch.tone !== "muted" && (
+            <span className={`badge ${watch.tone}`} title={watch.title}>
+              {watch.label}
+            </span>
+          )}
+          {!t.sequential && (t.watch.verdict === "now" || t.watch.verdict === "wait") && (
+            <span
+              className="dot warn"
+              title="Sequential download is off — pieces arrive out of order, so a partial file cannot be played."
+            />
+          )}
         </div>
-      ))}
-    </div>
+        <div className="small faint truncate">
+          {t.dlSpeed > 0 ? fmtRate(t.dlSpeed) : "no rate"}
+          {eta > 0 ? ` · ${fmtDuration(eta * 1000)} left` : ""} ·{" "}
+          {fmtPct(t.progress * 100)} of {fmtBytes(t.sizeBytes, 0)}
+        </div>
+        <div className="bar" style={{ marginTop: 5 }}>
+          <i style={{ width: `${Math.min(t.progress * 100, 100).toFixed(1)}%` }} />
+        </div>
+      </div>
+    </Link>
   );
 }

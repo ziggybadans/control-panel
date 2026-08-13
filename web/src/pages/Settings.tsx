@@ -336,6 +336,7 @@ function AboutCard() {
         { label: "snapraid", on: f.snapraid },
         { label: "Plex", on: f.plex },
         { label: `${f.apps} media app${f.apps === 1 ? "" : "s"}`, on: f.apps > 0 },
+        { label: "qBittorrent", on: f.qbittorrent },
         { label: "power control", on: f.power },
         { label: "self-update", on: !!f.updateRepo },
         { label: "fan control", on: f.fanControl },
@@ -492,7 +493,8 @@ function SafetyModal({ onClose }: { onClose: () => void }) {
               <div className="row">
                 <span className="badge neutral">confirm</span>
                 <span className="muted">
-                  service stop/restart · Minecraft stop/restart · kick
+                  service stop/restart · Minecraft stop/restart · kick · torrent
+                  delete · pause/resume all torrents
                 </span>
               </div>
               <div className="row">
@@ -537,6 +539,23 @@ function SafetyModal({ onClose }: { onClose: () => void }) {
               explicitly accepted), needs typed confirmation to open, caps
               concurrent sessions, closes idle ones, and logs every session
               open/close to the audit trail.
+            </p>
+          </div>
+
+          <div>
+            <div className="label" style={{ marginBottom: 6 }}>
+              Integrations
+            </div>
+            <p className="muted">
+              Plex, the *arr apps, and qBittorrent are reached with credentials
+              that never leave the server, and the panel is never a generic
+              proxy for them: only its own allowlisted operations exist as
+              endpoints. qBittorrent actions are limited to pause/resume, queue
+              priority, sequential download, first/last piece priority, recheck,
+              delete, and the global speed limits; torrent hashes are validated
+              before any request is forwarded, deleting is confirm-gated, and{" "}
+              <span className="mono">qbittorrent.allow_actions: false</span>{" "}
+              makes the page read-only.
             </p>
           </div>
 

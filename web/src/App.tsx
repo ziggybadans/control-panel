@@ -18,6 +18,7 @@ import { MinecraftPage } from "./pages/Minecraft";
 import { MCServerPage } from "./pages/McServer";
 import { PlexPage } from "./pages/Plex";
 import { AppsPage } from "./pages/Apps";
+import { QbittorrentPage } from "./pages/Qbittorrent";
 import { TasksPage } from "./pages/Tasks";
 import { ActivityPage } from "./pages/Activity";
 import { SettingsPage } from "./pages/Settings";
@@ -46,6 +47,7 @@ const router = createHashRouter([
       { path: "/minecraft/:id", element: <MCServerPage /> },
       { path: "/plex", element: <PlexPage /> },
       { path: "/apps", element: <AppsPage /> },
+      { path: "/qbittorrent", element: <QbittorrentPage /> },
       {
         path: "/terminal",
         element: (

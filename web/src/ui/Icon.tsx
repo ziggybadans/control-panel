@@ -150,6 +150,17 @@ const paths: Record<string, JSX.Element> = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  minus: <path d="M5 12h14" />,
+  // Torrent: one download fed by a swarm of peers.
+  torrent: (
+    <>
+      <path d="M12 3v8.5M8.5 8 12 11.5 15.5 8" />
+      <path d="M12 14.5v1.5M5.5 16v-1.5h13V16" />
+      <circle cx="5.5" cy="18.5" r="2" />
+      <circle cx="12" cy="18.5" r="2" />
+      <circle cx="18.5" cy="18.5" r="2" />
+    </>
+  ),
   trash: (
     <>
       <path d="M4 7h16M9.5 7V4.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V7" />

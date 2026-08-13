@@ -353,6 +353,15 @@
 .table td.r {
   font-variant-numeric: tabular-nums;
 }
+/* Measurements stay on one line: "48.0 GiB" split across two is unreadable. */
+.table td.num {
+  white-space: nowrap;
+}
+
+/* Wide tables scroll inside their card instead of spilling past it. */
+.table-scroll {
+  overflow-x: auto;
+}
 
 /* --- Inputs --------------------------------------------------------------- */
 
