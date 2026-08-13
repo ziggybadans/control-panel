@@ -23,17 +23,17 @@ type Status struct {
 }
 
 type Session struct {
-	User       string `json:"user"`
-	Title      string `json:"title"`
+	User        string `json:"user"`
+	Title       string `json:"title"`
 	Grandparent string `json:"grandparent,omitempty"` // show/artist for episodes/tracks
-	Type       string `json:"type"` // movie | episode | track
-	Player     string `json:"player"`
-	Product    string `json:"product"`
-	State      string `json:"state"` // playing | paused | buffering
-	ProgressMS int64  `json:"progressMs"`
-	DurationMS int64  `json:"durationMs"`
-	Decision   string `json:"decision"` // directplay | transcode
-	BitrateKbps int   `json:"bitrateKbps,omitempty"`
+	Type        string `json:"type"`                  // movie | episode | track
+	Player      string `json:"player"`
+	Product     string `json:"product"`
+	State       string `json:"state"` // playing | paused | buffering
+	ProgressMS  int64  `json:"progressMs"`
+	DurationMS  int64  `json:"durationMs"`
+	Decision    string `json:"decision"` // directplay | transcode
+	BitrateKbps int    `json:"bitrateKbps,omitempty"`
 }
 
 type Library struct {
@@ -51,12 +51,12 @@ type client struct {
 	token   string
 	http    *http.Client
 
-	mu        sync.Mutex
-	sessions  []Session
-	sessAt    time.Time
-	version   string
-	libs      []Library
-	libsAt    time.Time
+	mu       sync.Mutex
+	sessions []Session
+	sessAt   time.Time
+	version  string
+	libs     []Library
+	libsAt   time.Time
 }
 
 func NewClient(baseURL, token string) Provider {
@@ -81,7 +81,9 @@ func (c *client) Status(ctx context.Context) Status {
 		sessions, version, err := c.fetchSessions(ctx)
 		if err != nil {
 			st.Error = err.Error()
-			st.Libraries = c.libs
+			if c.libs != nil {
+				st.Libraries = c.libs
+			}
 			return st
 		}
 		c.sessions, c.version, c.sessAt = sessions, version, time.Now()
@@ -93,8 +95,12 @@ func (c *client) Status(ctx context.Context) Status {
 	}
 	st.Reachable = true
 	st.Version = c.version
-	st.Sessions = c.sessions
-	st.Libraries = c.libs
+	if c.sessions != nil {
+		st.Sessions = c.sessions
+	}
+	if c.libs != nil {
+		st.Libraries = c.libs
+	}
 	return st
 }
 

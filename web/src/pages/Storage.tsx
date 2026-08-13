@@ -58,7 +58,7 @@ export function StoragePage() {
           </div>
           <CapacityBar used={pool.used} total={pool.total} thick />
           <div className="pool-branches">
-            {pool.branches.map((b) => (
+            {(pool.branches ?? []).map((b) => (
               <div key={b.path} className="branch-tile">
                 <div className="row small">
                   <span className="mono truncate">{b.path}</span>

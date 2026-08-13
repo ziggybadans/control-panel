@@ -112,7 +112,7 @@ export function StorageWidget() {
           <CapacityBar used={p.used} total={p.total} thick />
           <div className="row small faint" style={{ marginTop: 4 }}>
             <span>
-              {p.branches.length} branches · {p.fsType}
+              {(p.branches ?? []).length} branches · {p.fsType}
             </span>
           </div>
         </div>
@@ -267,10 +267,10 @@ export function PlexWidget() {
   }
   return (
     <div className="mini-rows">
-      {data.sessions.length === 0 && (
+      {(data.sessions ?? []).length === 0 && (
         <div className="small faint">Nothing is playing right now.</div>
       )}
-      {data.sessions.map((s, i) => (
+      {(data.sessions ?? []).map((s, i) => (
         <div key={i} className="mini-row" style={{ alignItems: "flex-start" }}>
           <div className="grow" style={{ minWidth: 0 }}>
             <div className="truncate" style={{ fontWeight: 550 }}>

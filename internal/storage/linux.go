@@ -31,9 +31,9 @@ type linuxProvider struct {
 }
 
 type smartResult struct {
-	smart Smart
-	tempC float64
-	model string
+	smart  Smart
+	tempC  float64
+	model  string
 	serial string
 }
 
@@ -83,8 +83,23 @@ func (p *linuxProvider) Overview(ctx context.Context) (Overview, error) {
 	return ov, nil
 }
 
+// mergerfsBranchSpec reads a pool's branch list ("/a=RW:/b=RW") from the
+// mergerfs control file. Older releases exposed it as "srcmounts".
+func mergerfsBranchSpec(mount string) string {
+	ctrl := filepath.Join(mount, ".mergerfs")
+	buf := make([]byte, 8192)
+	for _, attr := range []string{"user.mergerfs.branches", "user.mergerfs.srcmounts"} {
+		n, err := syscall.Getxattr(ctrl, attr, buf)
+		if err != nil || n <= 0 {
+			continue
+		}
+		return strings.Trim(string(buf[:n]), "\x00\n\"")
+	}
+	return ""
+}
+
 func (p *linuxProvider) collect() Overview {
-	var ov Overview
+	ov := Overview{Pools: []Pool{}, Disks: []Disk{}, Mounts: []Mount{}}
 	mounts := readMounts()
 
 	// Pools: explicit config list, else every fuse.mergerfs mount.
@@ -105,14 +120,21 @@ func (p *linuxProvider) collect() Overview {
 		}
 		poolSet[m.mount] = true
 		pool := Pool{
-			Name:   filepath.Base(m.mount),
-			Mount:  m.mount,
-			FSType: m.fsType,
+			Name:     filepath.Base(m.mount),
+			Mount:    m.mount,
+			FSType:   m.fsType,
+			Branches: []Branch{},
 		}
 		pool.Total, pool.Used = statfs(m.mount)
 		// mergerfs encodes its branches in the mount source: "/a:/b:/c",
-		// possibly with per-branch =RW/=RO suffixes or globs.
-		for _, raw := range strings.Split(m.device, ":") {
+		// possibly with per-branch =RW/=RO suffixes or globs. A fsname=
+		// mount option replaces the source with an opaque label; the
+		// runtime branch list is then only available from the control file.
+		spec := m.device
+		if !strings.Contains(spec, "/") {
+			spec = mergerfsBranchSpec(m.mount)
+		}
+		for _, raw := range strings.Split(spec, ":") {
 			path := strings.SplitN(raw, "=", 2)[0]
 			matches, _ := filepath.Glob(path)
 			if len(matches) == 0 {
