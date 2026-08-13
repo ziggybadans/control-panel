@@ -1,10 +1,33 @@
 // Live metric chart widgets (CPU, memory, network, disk I/O).
 
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import type { Snapshot } from "../../api/types";
 import { fmtBytes, fmtPct, fmtRate } from "../../lib/format";
 import { useLatestMetrics, useMetricsHistory } from "../../state/live";
 import { TimeSeriesChart } from "../../ui/Chart";
+
+/**
+ * TimeSeriesChart that fills its flex slot: 110px in an auto-height card,
+ * growing with the panel when the user drag-resizes it taller.
+ */
+function FillChart(props: Omit<ComponentProps<typeof TimeSeriesChart>, "height">) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [h, setH] = useState(110);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      setH(Math.max(110, Math.floor(entries[0].contentRect.height)));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="chart-fill">
+      <TimeSeriesChart {...props} height={h} />
+    </div>
+  );
+}
 
 function useHistorySeries(
   selectors: ((s: Snapshot) => number | null)[],
@@ -41,13 +64,12 @@ export function CpuWidget() {
   const m = useLatestMetrics();
   const { timestamps, points } = useHistorySeries([(s) => s.cpu]);
   return (
-    <div>
-      <TimeSeriesChart
+    <div className="chart-widget">
+      <FillChart
         series={[{ name: "CPU", color: "var(--chart-1)", points: points[0] }]}
         timestamps={timestamps}
         yFormat={(v) => fmtPct(v)}
         yMax={100}
-        height={110}
       />
       <div className="core-bars" title="per-core utilisation">
         {(m?.perCore ?? []).map((c, i) => (
@@ -82,8 +104,8 @@ export function MemoryWidget() {
   ]);
   const total = m?.memTotal ?? 0;
   return (
-    <div>
-      <TimeSeriesChart
+    <div className="chart-widget">
+      <FillChart
         series={[
           { name: "Used", color: "var(--chart-1)", points: points[0] },
           { name: "Cached", color: "var(--chart-2)", points: points[1] },
@@ -91,7 +113,6 @@ export function MemoryWidget() {
         timestamps={timestamps}
         yFormat={(v) => fmtBytes(v, 0)}
         yMax={total || undefined}
-        height={110}
       />
       <div className="row" style={{ marginTop: 8 }}>
         <div className="legend">
@@ -135,15 +156,14 @@ export function NetworkWidget() {
   const m = useLatestMetrics();
   const { timestamps, points } = useHistorySeries([sumRx, sumTx]);
   return (
-    <div>
-      <TimeSeriesChart
+    <div className="chart-widget">
+      <FillChart
         series={[
           { name: "Down", color: "var(--chart-1)", points: points[0] },
           { name: "Up", color: "var(--chart-2)", points: points[1] },
         ]}
         timestamps={timestamps}
         yFormat={fmtRate}
-        height={110}
       />
       <div className="row" style={{ marginTop: 8 }}>
         <div className="legend">
@@ -191,15 +211,14 @@ export function DiskIOWidget() {
     return [...m.disk].sort((a, b) => b.utilPct - a.utilPct)[0];
   }, [m]);
   return (
-    <div>
-      <TimeSeriesChart
+    <div className="chart-widget">
+      <FillChart
         series={[
           { name: "Read", color: "var(--chart-1)", points: points[0] },
           { name: "Write", color: "var(--chart-2)", points: points[1] },
         ]}
         timestamps={timestamps}
         yFormat={fmtRate}
-        height={110}
       />
       <div className="row" style={{ marginTop: 8 }}>
         <div className="legend">

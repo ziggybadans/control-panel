@@ -30,10 +30,74 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--gap);
-  align-items: stretch;
+  /* Masonry: cards span enough 8px rows for their content (or their fixed
+     height), so a short card never stretches to its row's tallest sibling. */
+  grid-auto-rows: 8px;
 }
 .dash-grid > .card {
-  min-height: 120px;
+  position: relative;
+  overflow: hidden;
+  /* Auto-height cards take their natural (content) height; the row span
+     only reserves grid space. Stretching would cap the inner measurement
+     at the current span and deadlock growth. */
+  align-self: start;
+  width: 100%;
+}
+.dash-grid .widget-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+/* Fixed-height cards scroll their body instead of clipping it. */
+.dash-grid .card-b.grow {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.dash-grid .h-fixed .card-b.grow {
+  overflow-y: auto;
+}
+
+/* Corner resize grabber, revealed on hover. */
+.widget-grabber {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  opacity: 0;
+  z-index: 2;
+  touch-action: none;
+  transition: opacity var(--dur-1) var(--ease-out);
+}
+.dash-grid > .card:hover .widget-grabber {
+  opacity: 0.8;
+}
+.widget-grabber::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-3);
+  border-bottom: 2px solid var(--text-3);
+  border-bottom-right-radius: 3px;
+}
+
+/* Chart widgets stretch their plot into whatever height the card has. */
+.chart-widget {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.chart-fill {
+  flex: 1 1 auto;
+  min-height: 110px;
+  min-width: 0;
 }
 .w-1 {
   grid-column: span 1;

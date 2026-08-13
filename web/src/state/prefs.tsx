@@ -21,8 +21,13 @@ export type Density = "compact" | "comfortable";
 export interface WidgetPref {
   id: string;
   visible: boolean;
-  /** Column span: 1 = quarter, 2 = half, 4 = full row (12-col grid / 3). */
+  /** Column span: 1 = quarter, 2 = half, 4 = full row. */
   size: 1 | 2 | 3 | 4;
+  /**
+   * Panel height in px. Absent = the widget's default; 0 = explicit "auto"
+   * (size to content). Set by dragging the corner grabber.
+   */
+  h?: number;
 }
 
 export interface Prefs {
@@ -39,7 +44,8 @@ export const DEFAULT_WIDGETS: WidgetPref[] = [
   { id: "network", visible: true, size: 2 },
   { id: "diskio", visible: true, size: 2 },
   { id: "system", visible: true, size: 1 },
-  { id: "temps", visible: true, size: 1 },
+  // Sensor lists get long on real hardware; cap them and let them scroll.
+  { id: "temps", visible: true, size: 1, h: 280 },
   { id: "fans", visible: true, size: 1 },
   { id: "storage", visible: true, size: 2 },
   { id: "minecraft", visible: true, size: 2 },
@@ -70,7 +76,14 @@ function sanitize(raw: unknown): Prefs {
     for (const w of r.widgets) {
       if (w && typeof w.id === "string" && known.has(w.id)) {
         const size = [1, 2, 3, 4].includes(w.size as number) ? (w.size as 1 | 2 | 3 | 4) : known.get(w.id)!.size;
-        seen.push({ id: w.id, visible: w.visible !== false, size });
+        const entry: WidgetPref = { id: w.id, visible: w.visible !== false, size };
+        // h: 0 = explicit auto; other numbers clamp; absent = widget default.
+        if (typeof w.h === "number" && Number.isFinite(w.h)) {
+          entry.h = w.h <= 0 ? 0 : Math.round(Math.min(1400, Math.max(80, w.h)));
+        } else if (known.get(w.id)!.h !== undefined) {
+          entry.h = known.get(w.id)!.h;
+        }
+        seen.push(entry);
         known.delete(w.id);
       }
     }

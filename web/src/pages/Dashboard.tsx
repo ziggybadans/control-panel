@@ -1,17 +1,32 @@
-// Customizable dashboard: a 4-column grid of widgets that can be reordered
-// (drag), resized, and hidden. Layout persists server-side via prefs.
+// Customizable dashboard: a 4-column masonry grid of widgets. Cards size to
+// their content by default; the corner grabber drag-resizes width (snapping
+// to columns) and height (free px, per-widget minimum — double-click for
+// auto). Reorder (drag) and hide live in edit mode. Layout persists
+// server-side via prefs.
 
-import { useMemo, useState, type DragEvent } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { usePrefs, type WidgetPref } from "../state/prefs";
 import { Icon } from "../ui/Icon";
 import { withViewTransition } from "../ui/motion";
-import { WIDGETS } from "./widgets/registry";
+import { WIDGETS, type WidgetDef } from "./widgets/registry";
+
+/** Height of one masonry grid row in px (grid-auto-rows in CSS). */
+const ROW = 8;
+const MAX_H = 1400;
 
 export function Dashboard() {
   const { prefs, update, resetDashboard } = usePrefs();
   const [editing, setEditing] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const visible = useMemo(
     () => prefs.widgets.filter((w) => w.visible && WIDGETS[w.id]),
@@ -22,14 +37,21 @@ export function Dashboard() {
     [prefs.widgets],
   );
 
-  // Layout mutations run inside a view transition so widgets glide to
-  // their new positions instead of snapping.
-  function setWidgets(widgets: WidgetPref[]) {
-    withViewTransition(() => update({ widgets }));
+  // Reorder/hide/reset animate with a view transition; resize must not
+  // (it fires every pointer move).
+  function setWidgets(widgets: WidgetPref[], animate = true) {
+    if (animate) {
+      withViewTransition(() => update({ widgets }));
+    } else {
+      update({ widgets });
+    }
   }
 
-  function patchWidget(id: string, patch: Partial<WidgetPref>) {
-    setWidgets(prefs.widgets.map((w) => (w.id === id ? { ...w, ...patch } : w)));
+  function patchWidget(id: string, patch: Partial<WidgetPref>, animate = true) {
+    setWidgets(
+      prefs.widgets.map((w) => (w.id === id ? { ...w, ...patch } : w)),
+      animate,
+    );
   }
 
   function moveWidget(from: string, to: string) {
@@ -55,7 +77,7 @@ export function Dashboard() {
       <div className="row">
         <span className="small muted">
           {editing
-            ? "Drag to reorder · resize with the segment buttons · hide with ×"
+            ? "Drag cards to reorder · hide with × · resize anytime with the corner grabber"
             : ""}
         </span>
         <div className="row right">
@@ -74,71 +96,30 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="dash-grid">
-        {visible.map((w) => {
-          const def = WIDGETS[w.id];
-          const Comp = def.component;
-          return (
-            <div
-              key={w.id}
-              style={{ viewTransitionName: `widget-${w.id}` }}
-              className={[
-                `card w-${w.size}`,
-                editing ? "widget-editing" : "",
-                dropId === w.id && dragId !== w.id ? "widget-drop" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              draggable={editing}
-              onDragStart={() => setDragId(w.id)}
-              onDragEnd={() => {
-                setDragId(null);
-                setDropId(null);
-              }}
-              onDragOver={(e) => {
-                if (editing && dragId) {
-                  e.preventDefault();
-                  setDropId(w.id);
-                }
-              }}
-              onDrop={(e) => onDrop(e, w.id)}
-            >
-              <div className="card-h">
-                {editing && <Icon name="grip" size={14} className="faint" />}
-                <span className="label">{def.title}</span>
-                {editing ? (
-                  <div className="row right">
-                    <div className="choice-row" role="group" aria-label="width">
-                      {([1, 2, 3, 4] as const).map((s) => (
-                        <button
-                          key={s}
-                          className={`choice ${w.size === s ? "selected" : ""}`}
-                          style={{ padding: "1px 7px", fontSize: 11 }}
-                          onClick={() => patchWidget(w.id, { size: s })}
-                          title={`${s}/4 width`}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      className="btn btn-ghost btn-sm btn-icon"
-                      onClick={() => patchWidget(w.id, { visible: false })}
-                      title="Hide widget"
-                    >
-                      <Icon name="x" size={13} />
-                    </button>
-                  </div>
-                ) : (
-                  def.headerExtra && <def.headerExtra />
-                )}
-              </div>
-              <div className="card-b grow">
-                <Comp />
-              </div>
-            </div>
-          );
-        })}
+      <div className="dash-grid" ref={gridRef}>
+        {visible.map((w) => (
+          <WidgetCard
+            key={w.id}
+            w={w}
+            def={WIDGETS[w.id]}
+            editing={editing}
+            dropTarget={dropId === w.id && dragId !== w.id}
+            gridRef={gridRef}
+            patchWidget={patchWidget}
+            onDragStart={() => setDragId(w.id)}
+            onDragEnd={() => {
+              setDragId(null);
+              setDropId(null);
+            }}
+            onDragOver={(e) => {
+              if (editing && dragId) {
+                e.preventDefault();
+                setDropId(w.id);
+              }
+            }}
+            onDrop={(e) => onDrop(e, w.id)}
+          />
+        ))}
       </div>
 
       {editing && hidden.length > 0 && (
@@ -160,6 +141,172 @@ export function Dashboard() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function WidgetCard({
+  w,
+  def,
+  editing,
+  dropTarget,
+  gridRef,
+  patchWidget,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+}: {
+  w: WidgetPref;
+  def: WidgetDef;
+  editing: boolean;
+  dropTarget: boolean;
+  gridRef: React.RefObject<HTMLDivElement>;
+  patchWidget: (id: string, patch: Partial<WidgetPref>, animate?: boolean) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDragOver: (e: DragEvent) => void;
+  onDrop: (e: DragEvent) => void;
+}) {
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [contentH, setContentH] = useState<number | null>(null);
+  const [liveH, setLiveH] = useState<number | null>(null); // during a resize drag
+  const [rowGap, setRowGap] = useState(14);
+  const resize = useRef<{
+    startX: number;
+    startY: number;
+    startH: number;
+    startSize: number;
+    colW: number;
+    gap: number;
+    cols: number;
+    h: number;
+  } | null>(null);
+
+  const minH = def.minH ?? 96;
+  const fixedH = liveH ?? (w.h && w.h > 0 ? w.h : undefined);
+
+  // Auto mode: the masonry span follows the content's natural height.
+  useLayoutEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    const parent = el.parentElement?.parentElement; // the grid
+    if (parent) {
+      setRowGap(parseFloat(getComputedStyle(parent).rowGap) || 14);
+    }
+    const ro = new ResizeObserver((entries) => {
+      setContentH(entries[0].contentRect.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // +2 covers the card border (heights are border-box).
+  const effH = fixedH ?? (contentH !== null ? contentH + 2 : 120);
+  const span = Math.max(1, Math.ceil((effH + rowGap) / (ROW + rowGap)));
+  const Comp = def.component;
+
+  function onGrabberDown(e: ReactPointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const grid = gridRef.current;
+    const card = innerRef.current?.parentElement;
+    if (!grid || !card) return;
+    const cs = getComputedStyle(grid);
+    const cols = cs.gridTemplateColumns.split(" ").length;
+    const gap = parseFloat(cs.columnGap) || 14;
+    const colW = (grid.getBoundingClientRect().width - (cols - 1) * gap) / cols;
+    const startH = card.getBoundingClientRect().height;
+    resize.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startH,
+      startSize: w.size,
+      colW,
+      gap,
+      cols,
+      h: startH,
+    };
+    (e.target as Element).setPointerCapture(e.pointerId);
+  }
+
+  function onGrabberMove(e: ReactPointerEvent) {
+    const r = resize.current;
+    if (!r) return;
+    r.h = Math.min(MAX_H, Math.max(minH, Math.round(r.startH + e.clientY - r.startY)));
+    setLiveH(r.h);
+    const wantPx = r.startSize * r.colW + (r.startSize - 1) * r.gap + (e.clientX - r.startX);
+    const size = Math.min(r.cols, Math.max(1, Math.round((wantPx + r.gap) / (r.colW + r.gap))));
+    if (size !== w.size) {
+      patchWidget(w.id, { size: size as WidgetPref["size"] }, false);
+    }
+  }
+
+  function onGrabberUp() {
+    const r = resize.current;
+    if (!r) return;
+    resize.current = null;
+    setLiveH(null);
+    patchWidget(w.id, { h: r.h }, false);
+  }
+
+  return (
+    <div
+      style={{
+        viewTransitionName: `widget-${w.id}`,
+        gridRowEnd: `span ${span}`,
+        height: fixedH,
+      }}
+      className={[
+        `card w-${w.size}`,
+        fixedH !== undefined ? "h-fixed" : "",
+        editing ? "widget-editing" : "",
+        dropTarget ? "widget-drop" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      draggable={editing}
+      onDragStart={(e) => {
+        if ((e.target as HTMLElement).closest?.(".widget-grabber")) {
+          e.preventDefault();
+          return;
+        }
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      <div className="widget-inner" ref={innerRef}>
+        <div className="card-h">
+          {editing && <Icon name="grip" size={14} className="faint" />}
+          <span className="label">{def.title}</span>
+          {editing ? (
+            <div className="row right">
+              <button
+                className="btn btn-ghost btn-sm btn-icon"
+                onClick={() => patchWidget(w.id, { visible: false })}
+                title="Hide widget"
+              >
+                <Icon name="x" size={13} />
+              </button>
+            </div>
+          ) : (
+            def.headerExtra && <def.headerExtra />
+          )}
+        </div>
+        <div className="card-b grow">
+          <Comp />
+        </div>
+      </div>
+      <div
+        className="widget-grabber"
+        title="Drag to resize · double-click for automatic height"
+        onPointerDown={onGrabberDown}
+        onPointerMove={onGrabberMove}
+        onPointerUp={onGrabberUp}
+        onDoubleClick={() => patchWidget(w.id, { h: 0 }, false)}
+      />
     </div>
   );
 }
