@@ -24,7 +24,7 @@ const ACTION_LABELS: Record<ScheduleAction, string> = {
   "snapraid.scrub": "snapraid scrub",
 };
 
-function describeAction(s: Schedule): string {
+export function describeAction(s: Schedule): string {
   switch (s.action) {
     case "mc.backup":
       return `Back up ${s.server}${s.keep ? ` · keep ${s.keep}` : ""}`;
@@ -39,25 +39,27 @@ function describeAction(s: Schedule): string {
   }
 }
 
-function describeWhen(s: Schedule): string {
+export function describeWhen(s: Schedule): string {
   if (s.every) return `every ${s.every}`;
   if (s.daily) return `daily at ${s.daily}`;
   if (s.weekly) return `weekly ${s.weekly}`;
   return "—";
 }
 
-export function TasksPage() {
+/**
+ * The schedule table with its row actions (toggle, run-now, edit, delete).
+ * Shared between the Tasks page and each Minecraft server's Tasks tab.
+ */
+export function ScheduleTable({
+  schedules,
+  onEdit,
+}: {
+  schedules: Schedule[];
+  onEdit: (s: Schedule) => void;
+}) {
   const toast = useToast();
   const confirm = useConfirm();
   const qc = useQueryClient();
-  const [editing, setEditing] = useState<Schedule | "new" | null>(null);
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["schedules"],
-    queryFn: () => api<SchedulesResponse>("/api/schedules"),
-    refetchInterval: 15_000,
-  });
-  const schedules = data?.schedules ?? [];
 
   function refresh() {
     qc.invalidateQueries({ queryKey: ["schedules"] });
@@ -106,6 +108,91 @@ export function TasksPage() {
   }
 
   return (
+    <table className="table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Does</th>
+          <th>When</th>
+          <th>Last run</th>
+          <th>Next run</th>
+          <th className="r">Enabled</th>
+          <th className="r" style={{ width: 130 }}></th>
+        </tr>
+      </thead>
+      <tbody>
+        {schedules.map((s) => (
+          <tr key={s.id}>
+            <td style={{ fontWeight: 550 }}>{s.name}</td>
+            <td className="small muted">{describeAction(s)}</td>
+            <td className="small muted num">{describeWhen(s)}</td>
+            <td className="small">
+              {s.lastRun ? (
+                <span title={`${fmtDateTime(s.lastRun)} — ${s.lastResult ?? ""}`}>
+                  <span
+                    className={`dot ${s.lastResult?.startsWith("error") ? "crit" : "ok"}`}
+                    style={{ marginRight: 6 }}
+                  />
+                  <span className="muted">{fmtRelative(s.lastRun)}</span>
+                </span>
+              ) : (
+                <span className="faint">never</span>
+              )}
+            </td>
+            <td className="small muted num" title={fmtDateTime(s.nextRun)}>
+              {s.enabled ? fmtRelative(s.nextRun) : "—"}
+            </td>
+            <td className="r">
+              <Toggle
+                checked={s.enabled}
+                onChange={(v) => void toggle(s, v)}
+                label={`enable ${s.name}`}
+              />
+            </td>
+            <td className="r">
+              <div className="row" style={{ justifyContent: "flex-end", gap: 2 }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => void runNow(s)}
+                  title="Run once now"
+                >
+                  Run
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm btn-icon"
+                  onClick={() => onEdit(s)}
+                  title="Edit"
+                >
+                  <Icon name="edit" size={12} />
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm btn-icon crit-text"
+                  onClick={() => void remove(s)}
+                  title="Delete"
+                >
+                  <Icon name="trash" size={12} />
+                </button>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+export function TasksPage() {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState<Schedule | "new" | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["schedules"],
+    queryFn: () => api<SchedulesResponse>("/api/schedules"),
+    refetchInterval: 15_000,
+  });
+  const schedules = data?.schedules ?? [];
+
+  return (
     <div className="page">
       <TopbarActions>
         <button className="btn btn-sm btn-primary" onClick={() => setEditing("new")}>
@@ -125,78 +212,7 @@ export function TasksPage() {
       ) : (
         <div className="card">
           <div className="card-b flush">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Does</th>
-                  <th>When</th>
-                  <th>Last run</th>
-                  <th>Next run</th>
-                  <th className="r">Enabled</th>
-                  <th className="r" style={{ width: 130 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedules.map((s) => (
-                  <tr key={s.id}>
-                    <td style={{ fontWeight: 550 }}>{s.name}</td>
-                    <td className="small muted">{describeAction(s)}</td>
-                    <td className="small muted num">{describeWhen(s)}</td>
-                    <td className="small">
-                      {s.lastRun ? (
-                        <span title={`${fmtDateTime(s.lastRun)} — ${s.lastResult ?? ""}`}>
-                          <span
-                            className={`dot ${
-                              s.lastResult?.startsWith("error") ? "crit" : "ok"
-                            }`}
-                            style={{ marginRight: 6 }}
-                          />
-                          <span className="muted">{fmtRelative(s.lastRun)}</span>
-                        </span>
-                      ) : (
-                        <span className="faint">never</span>
-                      )}
-                    </td>
-                    <td className="small muted num" title={fmtDateTime(s.nextRun)}>
-                      {s.enabled ? fmtRelative(s.nextRun) : "—"}
-                    </td>
-                    <td className="r">
-                      <Toggle
-                        checked={s.enabled}
-                        onChange={(v) => void toggle(s, v)}
-                        label={`enable ${s.name}`}
-                      />
-                    </td>
-                    <td className="r">
-                      <div className="row" style={{ justifyContent: "flex-end", gap: 2 }}>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => void runNow(s)}
-                          title="Run once now"
-                        >
-                          Run
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm btn-icon"
-                          onClick={() => setEditing(s)}
-                          title="Edit"
-                        >
-                          <Icon name="edit" size={12} />
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm btn-icon crit-text"
-                          onClick={() => void remove(s)}
-                          title="Delete"
-                        >
-                          <Icon name="trash" size={12} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <ScheduleTable schedules={schedules} onEdit={(s) => setEditing(s)} />
           </div>
         </div>
       )}
@@ -204,7 +220,8 @@ export function TasksPage() {
       <div className="small faint">
         Failed runs retry twice at 5-minute intervals before waiting for the
         next occurrence. Every execution is recorded in the{" "}
-        <a href="#/activity">audit log</a>.
+        <a href="#/activity">audit log</a>. Minecraft-specific tasks also
+        appear on each server's Tasks tab.
       </div>
 
       {editing && (
@@ -212,7 +229,7 @@ export function TasksPage() {
           initial={editing === "new" ? null : editing}
           onClose={(changed) => {
             setEditing(null);
-            if (changed) refresh();
+            if (changed) qc.invalidateQueries({ queryKey: ["schedules"] });
           }}
         />
       )}
@@ -230,11 +247,14 @@ export function TaskEditor({
   initial,
   onClose,
   preset,
+  lockServer,
 }: {
   initial: Schedule | null;
   onClose: (changed: boolean) => void;
   /** Prefills for the "new" form (used by the auto-backup shortcut). */
   preset?: Partial<Schedule>;
+  /** Pin the task to one Minecraft server (per-server Tasks tab). */
+  lockServer?: string;
 }) {
   const toast = useToast();
   const mcServers = useMCServers();
@@ -244,8 +264,8 @@ export function TaskEditor({
     name: "",
     enabled: true,
     daily: "04:00",
-    action: "mc.backup" as ScheduleAction,
-    server: mcServers[0]?.id,
+    action: (lockServer ? "mc.command" : "mc.backup") as ScheduleAction,
+    server: lockServer ?? mcServers[0]?.id,
     keep: 7,
     nextRun: 0,
     ...preset,
@@ -253,7 +273,9 @@ export function TaskEditor({
 
   const [name, setName] = useState(base.name);
   const [action, setAction] = useState<ScheduleAction>(base.action);
-  const [server, setServer] = useState(base.server ?? mcServers[0]?.id ?? "");
+  const [server, setServer] = useState(
+    lockServer ?? base.server ?? mcServers[0]?.id ?? "",
+  );
   const [unit, setUnit] = useState(base.unit ?? "");
   const [command, setCommand] = useState(base.command ?? "");
   const [keep, setKeep] = useState(base.keep ?? 0);
@@ -328,11 +350,13 @@ export function TaskEditor({
                 value={action}
                 onChange={(e) => setAction(e.target.value as ScheduleAction)}
               >
-                {Object.entries(ACTION_LABELS).map(([id, label]) => (
-                  <option key={id} value={id}>
-                    {label}
-                  </option>
-                ))}
+                {Object.entries(ACTION_LABELS)
+                  .filter(([id]) => !lockServer || id.startsWith("mc."))
+                  .map(([id, label]) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
               </select>
             </div>
           </div>
@@ -341,13 +365,19 @@ export function TaskEditor({
             <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div className="field">
                 <span className="label">Server</span>
-                <select className="select mono" value={server} onChange={(e) => setServer(e.target.value)}>
-                  {mcServers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                {lockServer ? (
+                  <span className="input mono" style={{ display: "flex", alignItems: "center" }}>
+                    {lockServer}
+                  </span>
+                ) : (
+                  <select className="select mono" value={server} onChange={(e) => setServer(e.target.value)}>
+                    {mcServers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               {action === "mc.backup" && (
                 <div className="field">
