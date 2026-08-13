@@ -10,6 +10,7 @@ import "@xterm/xterm/css/xterm.css";
 import { api } from "../api/client";
 import type { TerminalSession, TerminalStatus } from "../api/types";
 import { fmtTime } from "../lib/format";
+import { TopbarActions } from "../shell/Layout";
 import { EmptyState, Spinner } from "../ui/bits";
 import { useConfirm } from "../ui/Confirm";
 import { Icon } from "../ui/Icon";
@@ -117,6 +118,26 @@ export default function TerminalPage() {
 
   return (
     <div className="page term-page">
+      <TopbarActions>
+        {activeId && (
+          <button
+            className="btn btn-sm"
+            onClick={() => void closeSession(activeId)}
+            title="End this shell session"
+          >
+            <Icon name="x" size={12} />
+            Close session
+          </button>
+        )}
+        <button
+          className="btn btn-sm btn-primary"
+          disabled={busy || sessions.length >= (data.maxSessions ?? 2)}
+          onClick={() => void openSession()}
+        >
+          {busy ? <Spinner size={11} /> : <Icon name="terminal" size={12} />}
+          New session
+        </button>
+      </TopbarActions>
       <div className="row wrap">
         <div className="choice-row" role="tablist" aria-label="terminal sessions">
           {sessions.map((s, i) => (
@@ -133,26 +154,6 @@ export default function TerminalPage() {
           ))}
         </div>
         <span className="small muted">{data.description}</span>
-        <div className="row right">
-          {activeId && (
-            <button
-              className="btn btn-sm"
-              onClick={() => void closeSession(activeId)}
-              title="End this shell session"
-            >
-              <Icon name="x" size={12} />
-              Close session
-            </button>
-          )}
-          <button
-            className="btn btn-sm btn-primary"
-            disabled={busy || sessions.length >= (data.maxSessions ?? 2)}
-            onClick={() => void openSession()}
-          >
-            {busy ? <Spinner size={11} /> : <Icon name="terminal" size={12} />}
-            New session
-          </button>
-        </div>
       </div>
 
       {activeId ? (

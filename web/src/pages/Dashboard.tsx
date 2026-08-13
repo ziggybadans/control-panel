@@ -12,6 +12,7 @@ import {
   type DragEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { TopbarActions } from "../shell/Layout";
 import { usePrefs, type WidgetPref } from "../state/prefs";
 import { Icon } from "../ui/Icon";
 import { withViewTransition } from "../ui/motion";
@@ -74,27 +75,26 @@ export function Dashboard() {
 
   return (
     <div className="page">
-      <div className="row">
-        <span className="small muted">
-          {editing
-            ? "Drag cards to reorder · hide with × · resize anytime with the corner grabber"
-            : ""}
-        </span>
-        <div className="row right">
-          {editing && (
-            <button className="btn btn-sm" onClick={resetDashboard}>
-              Reset layout
-            </button>
-          )}
-          <button
-            className={editing ? "btn btn-sm btn-primary" : "btn btn-sm"}
-            onClick={() => setEditing((v) => !v)}
-          >
-            <Icon name="edit" size={13} />
-            {editing ? "Done" : "Customise"}
+      <TopbarActions>
+        {editing && (
+          <button className="btn btn-sm" onClick={resetDashboard}>
+            Reset layout
           </button>
+        )}
+        <button
+          className={editing ? "btn btn-sm btn-primary" : "btn btn-sm"}
+          onClick={() => setEditing((v) => !v)}
+        >
+          <Icon name="edit" size={13} />
+          {editing ? "Done" : "Customise"}
+        </button>
+      </TopbarActions>
+      {editing && (
+        <div className="small muted">
+          Drag cards to reorder · hide with × · resize anytime with the corner
+          grabber
         </div>
-      </div>
+      )}
 
       <div className="dash-grid" ref={gridRef}>
         {visible.map((w) => (

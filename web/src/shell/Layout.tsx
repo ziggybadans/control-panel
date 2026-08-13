@@ -1,6 +1,8 @@
-// App shell: sidebar navigation + topbar + content outlet.
+// App shell: sidebar navigation + topbar + content outlet. Pages put their
+// primary actions in the topbar via <TopbarActions>.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useConnState, useJobs, useMCServers, useServices } from "../state/live";
 import { useSystem } from "../state/system";
@@ -35,9 +37,21 @@ const TITLES: Record<string, string> = {
   "/settings": "Settings",
 };
 
+/**
+ * Renders children into the topbar's right-hand slot — the home for each
+ * page's primary action (Customise, New server, New session…).
+ */
+export function TopbarActions({ children }: { children: ReactNode }) {
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setTarget(document.getElementById("topbar-actions"));
+  }, []);
+  return target ? createPortal(children, target) : null;
+}
+
 export function Layout() {
   const conn = useConnState();
-  const { info } = useSystem();
+  const { info, uptime } = useSystem();
   const location = useLocation();
   const mcServers = useMCServers();
   const services = useServices();
@@ -122,8 +136,20 @@ export function Layout() {
             <span>{conn === "live" ? "Live" : "Reconnecting…"}</span>
             {info?.mock && <span className="badge neutral right">mock</span>}
           </div>
+          {info && (
+            <div className="num" title="kernel">
+              {info.kernel}
+            </div>
+          )}
           <div className="num">
-            {info?.version ? (info.version === "dev" ? "dev build" : `v${info.version}`) : ""}
+            {info && (
+              <>
+                <span title="host uptime">up {uptime}</span>
+                <span className="faint"> · </span>
+              </>
+            )}
+            {/* Build versions already carry their "v" (git describe). */}
+            {info?.version === "dev" ? "dev build" : info?.version ?? ""}
           </div>
         </div>
       </aside>
@@ -131,7 +157,8 @@ export function Layout() {
         <header className="topbar">
           {/* Keyed so the title replays its entrance on page change. */}
           <h1 key={title}>{title}</h1>
-          <TopbarStatus />
+          {/* Pages portal their primary actions here (TopbarActions). */}
+          <div id="topbar-actions" className="row right" />
         </header>
         <div className="content">
           <Outlet />
@@ -141,21 +168,3 @@ export function Layout() {
   );
 }
 
-function TopbarStatus() {
-  const { info, uptime } = useSystem();
-  return (
-    <div className="row right small muted">
-      {info && (
-        <>
-          <span className="num" title="kernel">
-            {info.kernel}
-          </span>
-          <span className="faint">·</span>
-          <span className="num" title="uptime">
-            up {uptime}
-          </span>
-        </>
-      )}
-    </div>
-  );
-}

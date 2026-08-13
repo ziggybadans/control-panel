@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { useMCServers } from "../state/live";
 import type { MCServer } from "../api/types";
 import { fmtBytes, fmtPct, fmtUptimeSince } from "../lib/format";
+import { TopbarActions } from "../shell/Layout";
 import { Card, EmptyState, MCStateBadge } from "../ui/bits";
 import { Icon } from "../ui/Icon";
 import { useMCActions } from "./mc/actions";
@@ -17,15 +18,15 @@ export function MinecraftPage() {
 
   return (
     <div className="page">
-      <div className="row">
-        <span className="small muted">
+      <TopbarActions>
+        <span className="small muted num">
           {servers.length} server{servers.length === 1 ? "" : "s"}
         </span>
-        <button className="btn btn-sm btn-primary right" onClick={() => setSetupOpen(true)}>
+        <button className="btn btn-sm btn-primary" onClick={() => setSetupOpen(true)}>
           <Icon name="plus" size={12} />
           New server
         </button>
-      </div>
+      </TopbarActions>
       {setupOpen && <SetupModal onClose={() => setSetupOpen(false)} />}
       {servers.length === 0 ? (
         <Card title="Servers">
