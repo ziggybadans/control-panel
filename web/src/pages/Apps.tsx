@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { AppStatus, AppsResponse } from "../api/types";
 import { fmtPct } from "../lib/format";
+import { externalURL } from "../lib/url";
 import { Card, EmptyState, Spinner } from "../ui/bits";
 import { Icon } from "../ui/Icon";
 
@@ -81,7 +82,7 @@ function AppCard({ app }: { app: AppStatus }) {
           )}
           <a
             className="btn btn-ghost btn-sm"
-            href={app.url}
+            href={externalURL(app.url)}
             target="_blank"
             rel="noreferrer"
             title={`Open ${app.name}`}
