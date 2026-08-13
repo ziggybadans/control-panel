@@ -47,3 +47,23 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             dist/control-panel-linux-amd64 dist/SHA256SUMS \
             --title "$GITHUB_REF_NAME" --generate-notes
+
+  # Panel Bar menu bar companion, attached to the same release as a
+  # drag-to-Applications DMG (universal, ad-hoc signed — right-click Open
+  # on first launch).
+  macos-app:
+    needs: release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build DMG
+        run: make mac-dmg
+
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" --pattern SHA256SUMS --output SHA256SUMS
+          (cd dist && shasum -a 256 PanelBar.dmg) >> SHA256SUMS
+          gh release upload "$GITHUB_REF_NAME" dist/PanelBar.dmg SHA256SUMS --clobber

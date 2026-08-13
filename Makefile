@@ -38,6 +38,22 @@ deploy: release ## build, install onto DEPLOY_HOST, restart the panel
 
 ## macOS menu bar app --------------------------------------------------------
 
+mac-dmg: ## universal Panel Bar.app packaged as dist/PanelBar.dmg
+	cd macbar && swift build -c release --triple arm64-apple-macosx
+	cd macbar && swift build -c release --triple x86_64-apple-macosx
+	rm -rf "dist/Panel Bar.app" dist/dmg dist/PanelBar.dmg
+	mkdir -p "dist/Panel Bar.app/Contents/MacOS"
+	lipo -create -output "dist/Panel Bar.app/Contents/MacOS/PanelBar" \
+		macbar/.build/arm64-apple-macosx/release/PanelBar \
+		macbar/.build/x86_64-apple-macosx/release/PanelBar
+	cp macbar/Info.plist "dist/Panel Bar.app/Contents/Info.plist"
+	codesign --force --sign - "dist/Panel Bar.app"
+	mkdir -p dist/dmg
+	cp -R "dist/Panel Bar.app" dist/dmg/
+	ln -s /Applications dist/dmg/Applications
+	hdiutil create -volname "Panel Bar" -srcfolder dist/dmg -ov -format UDZO dist/PanelBar.dmg
+	rm -rf dist/dmg
+
 mac-bar: ## build the menu bar companion (dist/Panel Bar.app)
 	cd macbar && swift build -c release
 	rm -rf "dist/Panel Bar.app"
